@@ -127,16 +127,12 @@ export function useOrderDetailForm(quotations: Quotation[]) {
     );
   };
 
-  // 明細が完全に入力済みかどうか
+  // 明細が完全に入力済みかどうか（必須フィールドのみチェック）
   const isDetailComplete = (detail: DetailItem): boolean => {
     const base =
       detail.productName !== "" &&
-      detail.modelNumber !== "" &&
-      detail.unitPrice !== "" &&
-      Number(detail.unitPrice) > 0 &&
-      detail.quantity !== "" &&
-      Number(detail.quantity) > 0 &&
       detail.amount !== "" &&
+      !Number.isNaN(detail.amount) &&
       Number(detail.amount) > 0;
 
     if (form.getValues("taxType") === "tax_inclusive") {

@@ -1,3 +1,5 @@
+import { z } from "zod";
+
 /** 税区分 */
 export type TaxType = "tax_exclusive" | "tax_inclusive";
 
@@ -33,6 +35,40 @@ export interface SavedQuotationDetail {
   details: DetailItem[];
   subtotal: number;
 }
+
+/** 明細行の Zod スキーマ */
+export const detailItemSchema = z.object({
+  productName: z.string().min(1, "商品名は必須です"),
+  modelNumber: z.string(),
+  unitPrice: z.union([z.number(), z.literal(""), z.nan()]),
+  quantity: z.union([z.number(), z.literal(""), z.nan()]),
+  taxRate: z.union([z.literal(8), z.literal(10), z.literal(""), z.nan()]),
+  amount: z
+    .union([z.number(), z.literal(""), z.nan()])
+    .refine((val) => val !== "" && !Number.isNaN(val) && Number(val) > 0, {
+      message: "金額は必須です",
+    }),
+});
+
+/** モーダルフォームの Zod スキーマ */
+export const modalFormSchema = z
+  .object({
+    taxType: z.enum(["tax_exclusive", "tax_inclusive"]),
+    currentDetails: z.array(detailItemSchema),
+  })
+  .superRefine((data, ctx) => {
+    if (data.taxType === "tax_inclusive") {
+      data.currentDetails.forEach((detail, index) => {
+        if (detail.taxRate !== 8 && detail.taxRate !== 10) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: "税率を選択してください",
+            path: ["currentDetails", index, "taxRate"],
+          });
+        }
+      });
+    }
+  });
 
 /** ページレベルのフォームデータ（認可依頼ペイロード） */
 export interface PageFormData {
