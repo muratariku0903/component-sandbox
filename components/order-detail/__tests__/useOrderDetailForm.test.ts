@@ -413,6 +413,49 @@ describe("useOrderDetailForm", () => {
       // 見積書2が入力途中 → false
       expect(result.current.isAllFilled()).toBe(false);
     });
+
+    it("非表示の見積書に入力済み明細と空の明細が混在する場合は false", () => {
+      const { result } = renderHook(() =>
+        useOrderDetailForm(mockQuotations)
+      );
+
+      // 見積書1に全入力
+      act(() => {
+        result.current.selectQuotation("quote-1");
+      });
+      act(() => {
+        result.current.form.setValue("currentDetails.0.productName", "商品A");
+        result.current.form.setValue("currentDetails.0.modelNumber", "M-001");
+        result.current.form.setValue("currentDetails.0.unitPrice", 100);
+        result.current.form.setValue("currentDetails.0.quantity", 10);
+        result.current.form.setValue("currentDetails.0.amount", 1000);
+      });
+
+      // 見積書2に切り替え、明細1を全入力
+      act(() => {
+        result.current.selectQuotation("quote-2");
+      });
+      act(() => {
+        result.current.form.setValue("currentDetails.0.productName", "商品B");
+        result.current.form.setValue("currentDetails.0.modelNumber", "M-002");
+        result.current.form.setValue("currentDetails.0.unitPrice", 200);
+        result.current.form.setValue("currentDetails.0.quantity", 5);
+        result.current.form.setValue("currentDetails.0.amount", 1000);
+      });
+
+      // 見積書2に空の明細行を追加（明細2は空のまま）
+      act(() => {
+        result.current.addDetailRow();
+      });
+
+      // 見積書1に戻る
+      act(() => {
+        result.current.selectQuotation("quote-1");
+      });
+
+      // 非表示の見積書2に入力済み明細1 + 空の明細2 → 入力途中とみなして false
+      expect(result.current.isAllFilled()).toBe(false);
+    });
   });
 
   // --- リセット ---

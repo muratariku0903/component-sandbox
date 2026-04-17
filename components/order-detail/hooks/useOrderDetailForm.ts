@@ -154,7 +154,10 @@ export function useOrderDetailForm(quotations: Quotation[]) {
 
   // 送信可能かチェック
   // 現在表示中の見積書: 全明細が入力完了でなければ非活性（空もNG）
-  // 他の見積書: 空の明細はスキップ、入力途中はNG
+  // 他の見積書:
+  //   全明細が空（未着手）→ スキップ
+  //   一部入力済み + 一部空 → NG（入力途中とみなす）
+  //   入力途中 → NG
   const isAllFilled = useCallback((): boolean => {
     const allData = { ...quotationDataRef.current };
     if (selectedQuotationId) {
@@ -170,13 +173,16 @@ export function useOrderDetailForm(quotations: Quotation[]) {
       if (!details || details.length === 0) continue;
       const isCurrent = quotationId === selectedQuotationId;
 
+      // 非表示の見積書: 全明細が空なら未着手としてスキップ
+      if (!isCurrent) {
+        const allEmpty = details.every((d) => isDetailEmpty(d));
+        if (allEmpty) continue;
+      }
+
       for (const detail of details) {
         if (isDetailEmpty(detail)) {
-          if (isCurrent) {
-            // 現在表示中の見積書では空の明細も「未完了」扱い
-            return false;
-          }
-          continue;
+          // 現在表示中、または一部入力済みの見積書 → 空の明細は「未完了」
+          return false;
         }
         if (isDetailComplete(detail)) {
           hasAtLeastOneComplete = true;
