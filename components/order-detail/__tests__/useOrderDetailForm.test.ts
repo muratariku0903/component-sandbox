@@ -297,7 +297,7 @@ describe("useOrderDetailForm", () => {
       expect(result.current.isAllFilled()).toBe(true);
     });
 
-    it("入力済みの見積書がある状態で、別の見積書が空なら true（空はスキップ）", () => {
+    it("現在表示中の見積書が空なら false（空の明細はスキップしない）", () => {
       const { result } = renderHook(() =>
         useOrderDetailForm(mockQuotations)
       );
@@ -314,12 +314,73 @@ describe("useOrderDetailForm", () => {
         result.current.form.setValue("currentDetails.0.amount", 1000);
       });
 
-      // 見積書2に切り替え（空の明細1行）
+      // 見積書2に切り替え（空の明細1行 = 現在表示中が未完了）
       act(() => {
         result.current.selectQuotation("quote-2");
       });
 
-      // 見積書1が完了済み + 見積書2は空 → true
+      // 現在表示中の見積書2が空 → false
+      expect(result.current.isAllFilled()).toBe(false);
+    });
+
+    it("空の見積書から入力済み見積書に戻ると true", () => {
+      const { result } = renderHook(() =>
+        useOrderDetailForm(mockQuotations)
+      );
+
+      // 見積書1に全入力
+      act(() => {
+        result.current.selectQuotation("quote-1");
+      });
+      act(() => {
+        result.current.form.setValue("currentDetails.0.productName", "商品A");
+        result.current.form.setValue("currentDetails.0.modelNumber", "M-001");
+        result.current.form.setValue("currentDetails.0.unitPrice", 100);
+        result.current.form.setValue("currentDetails.0.quantity", 10);
+        result.current.form.setValue("currentDetails.0.amount", 1000);
+      });
+
+      // 見積書2に切り替え（空）
+      act(() => {
+        result.current.selectQuotation("quote-2");
+      });
+      expect(result.current.isAllFilled()).toBe(false);
+
+      // 見積書1に戻る → 入力済みなので true
+      act(() => {
+        result.current.selectQuotation("quote-1");
+      });
+      expect(result.current.isAllFilled()).toBe(true);
+    });
+
+    it("他の見積書の空の明細はスキップされる（NaN含む）", () => {
+      const { result } = renderHook(() =>
+        useOrderDetailForm(mockQuotations)
+      );
+
+      // 見積書2に切り替えて数値フィールドをNaNにする（valueAsNumber: trueの未入力状態）
+      act(() => {
+        result.current.selectQuotation("quote-2");
+      });
+      act(() => {
+        result.current.form.setValue("currentDetails.0.unitPrice", NaN);
+        result.current.form.setValue("currentDetails.0.quantity", NaN);
+        result.current.form.setValue("currentDetails.0.amount", NaN);
+      });
+
+      // 見積書1に切り替えて全入力
+      act(() => {
+        result.current.selectQuotation("quote-1");
+      });
+      act(() => {
+        result.current.form.setValue("currentDetails.0.productName", "商品A");
+        result.current.form.setValue("currentDetails.0.modelNumber", "M-001");
+        result.current.form.setValue("currentDetails.0.unitPrice", 100);
+        result.current.form.setValue("currentDetails.0.quantity", 10);
+        result.current.form.setValue("currentDetails.0.amount", 1000);
+      });
+
+      // 現在表示中の見積書1が完了済み + 見積書2は非表示で空（スキップ）→ true
       expect(result.current.isAllFilled()).toBe(true);
     });
 

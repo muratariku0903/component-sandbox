@@ -111,14 +111,19 @@ export function useOrderDetailForm(quotations: Quotation[]) {
     quotationDataRef.current = {};
   }, [form]);
 
+  // 数値フィールドが空かどうか（valueAsNumber: true の場合 NaN になる）
+  const isNumericEmpty = (value: number | ""): boolean => {
+    return value === "" || value === 0 || Number.isNaN(value);
+  };
+
   // 明細が完全に空かどうか
   const isDetailEmpty = (detail: DetailItem): boolean => {
     return (
       detail.productName === "" &&
       detail.modelNumber === "" &&
-      (detail.unitPrice === "" || detail.unitPrice === 0) &&
-      (detail.quantity === "" || detail.quantity === 0) &&
-      (detail.amount === "" || detail.amount === 0)
+      isNumericEmpty(detail.unitPrice) &&
+      isNumericEmpty(detail.quantity) &&
+      isNumericEmpty(detail.amount)
     );
   };
 
@@ -148,8 +153,9 @@ export function useOrderDetailForm(quotations: Quotation[]) {
   }, [saveCurrentToRef]);
 
   // 送信可能かチェック
+  // 現在表示中の見積書: 全明細が入力完了でなければ非活性（空もNG）
+  // 他の見積書: 空の明細はスキップ、入力途中はNG
   const isAllFilled = useCallback((): boolean => {
-    // 現在表示中のデータを一時的に ref に反映して判定
     const allData = { ...quotationDataRef.current };
     if (selectedQuotationId) {
       const current = getValues("currentDetails");
@@ -160,10 +166,18 @@ export function useOrderDetailForm(quotations: Quotation[]) {
 
     let hasAtLeastOneComplete = false;
 
-    for (const [, details] of Object.entries(allData)) {
+    for (const [quotationId, details] of Object.entries(allData)) {
       if (!details || details.length === 0) continue;
+      const isCurrent = quotationId === selectedQuotationId;
+
       for (const detail of details) {
-        if (isDetailEmpty(detail)) continue;
+        if (isDetailEmpty(detail)) {
+          if (isCurrent) {
+            // 現在表示中の見積書では空の明細も「未完了」扱い
+            return false;
+          }
+          continue;
+        }
         if (isDetailComplete(detail)) {
           hasAtLeastOneComplete = true;
         } else {
