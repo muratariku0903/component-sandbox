@@ -3,7 +3,7 @@ import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Provider } from "@/components/ui/provider";
 import { AddOrderDetailModal } from "../AddOrderDetailModal";
-import type { Quotation, SavedQuotationDetail } from "../types";
+import type { Quotation, SavedQuotationDetail } from "../../shared/types";
 
 const mockQuotations: Quotation[] = [
   { id: "quote-1", name: "見積書1" },

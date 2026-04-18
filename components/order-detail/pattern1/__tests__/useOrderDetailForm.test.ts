@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { renderHook, act } from "@testing-library/react";
 import { useOrderDetailForm } from "../hooks/useOrderDetailForm";
-import type { Quotation, DetailItem, SavedQuotationDetail } from "../types";
+import type { Quotation, DetailItem, SavedQuotationDetail } from "../../shared/types";
 
 const mockQuotations: Quotation[] = [
   { id: "quote-1", name: "見積書1" },

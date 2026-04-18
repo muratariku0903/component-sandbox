@@ -5,7 +5,7 @@ import {
   NativeSelectField,
 } from "@/components/ui/native-select";
 import { Radio, RadioGroup } from "@/components/ui/radio";
-import type { Quotation, TaxType } from "./types";
+import type { Quotation, TaxType } from "../shared/types";
 
 interface QuotationSelectorProps {
   quotations: Quotation[];

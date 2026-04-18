@@ -12,7 +12,7 @@ import {
 import { QuotationSelector } from "./QuotationSelector";
 import { DetailInputForm } from "./DetailInputForm";
 import { useOrderDetailForm } from "./hooks/useOrderDetailForm";
-import type { Quotation, SavedQuotationDetail, TaxType } from "./types";
+import type { Quotation, SavedQuotationDetail, TaxType } from "../shared/types";
 
 interface AddOrderDetailModalProps {
   open: boolean;

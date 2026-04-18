@@ -5,7 +5,7 @@ import {
   NativeSelectField,
 } from "@/components/ui/native-select";
 import type { UseFormReturn, UseFieldArrayReturn } from "react-hook-form";
-import type { ModalFormData, TaxType } from "./types";
+import type { ModalFormData, TaxType } from "../shared/types";
 import { LuPlus, LuTrash2 } from "react-icons/lu";
 
 interface DetailInputFormProps {

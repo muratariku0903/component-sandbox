@@ -5,7 +5,7 @@ import { Field } from "@/components/ui/field";
 import { OrderDetailSummary } from "./OrderDetailSummary";
 import { QuotationTable } from "./QuotationTable";
 import { AddOrderDetailModal } from "./AddOrderDetailModal";
-import type { Quotation, SavedQuotationDetail, PageFormData } from "./types";
+import type { Quotation, SavedQuotationDetail, PageFormData } from "../shared/types";
 import { LuPlus, LuPencil } from "react-icons/lu";
 
 interface OrderDetailPageProps {

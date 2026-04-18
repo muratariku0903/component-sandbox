@@ -1,5 +1,5 @@
 import { Box, Table, Text } from "@chakra-ui/react";
-import type { SavedQuotationDetail } from "./types";
+import type { SavedQuotationDetail } from "../shared/types";
 
 interface QuotationTableProps {
   detail: SavedQuotationDetail;

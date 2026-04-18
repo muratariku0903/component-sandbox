@@ -1,6 +1,6 @@
 import { useForm, useFieldArray } from "react-hook-form";
 import { useState, useCallback, useRef } from "react";
-import type { ModalFormData, DetailItem, Quotation, SavedQuotationDetail } from "../types";
+import type { ModalFormData, DetailItem, Quotation, SavedQuotationDetail } from "../../shared/types";
 
 const createEmptyDetail = (): DetailItem => ({
   productName: "",
