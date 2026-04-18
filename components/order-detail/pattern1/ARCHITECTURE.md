@@ -167,6 +167,24 @@ const quotationDataRef = useRef<Record<string, DetailItem[]>>({});
 
 ---
 
+## 認可依頼時のバリデーション（OrderDetailPage）
+
+認可依頼ボタン押下時に、価格交渉金額と発注金額の一致を検証する。
+
+```
+認可依頼ボタン押下
+  ↓ RHF handleSubmit（orderName の required チェック）
+  ↓ 通過後、コールバック内で金額チェック
+  ├── negotiationPrice === orderAmount → 送信処理（console.log / 将来 API）
+  └── negotiationPrice !== orderAmount → priceError に設定、送信中断
+```
+
+- `priceError` は `useState<string>("")` で管理
+- 明細を再編集（`handleModalSave`）すると `setPriceError("")` でクリア
+- サマリーは見積書テーブルの下、認可依頼ボタンの上に配置
+
+---
+
 ## 注意事項（実装時の教訓）
 
 ### useFieldArray の name は動的に変えない

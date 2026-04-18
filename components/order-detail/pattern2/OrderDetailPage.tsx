@@ -22,7 +22,6 @@ export function OrderDetailPage({
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [priceError, setPriceError] = useState("");
 
-  // ページレベルのフォーム: 発注名 + 保存済み明細
   const pageForm = useForm<PageFormData>({
     defaultValues: initialData ?? {
       orderName: "",
