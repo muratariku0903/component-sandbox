@@ -11,17 +11,19 @@ import { LuPlus, LuPencil } from "react-icons/lu";
 interface OrderDetailPageProps {
   quotations: Quotation[];
   negotiationPrice?: number;
+  initialData?: PageFormData;
 }
 
 export function OrderDetailPage({
   quotations,
   negotiationPrice = 0,
+  initialData,
 }: OrderDetailPageProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   // ページレベルのフォーム: 発注名 + 保存済み明細
   const pageForm = useForm<PageFormData>({
-    defaultValues: {
+    defaultValues: initialData ?? {
       orderName: "",
       savedDetails: [],
     },
