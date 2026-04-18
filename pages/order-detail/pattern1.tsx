@@ -1,8 +1,8 @@
 import { useState } from "react";
 import Head from "next/head";
 import { Box, HStack, Button } from "@chakra-ui/react";
-import { OrderDetailPage } from "@/components/order-detail/pattern1/OrderDetailPage";
-import type { Quotation, PageFormData } from "@/components/order-detail/shared/types";
+import { OrderDetailPage } from "@/features/order-detail/pattern1/OrderDetailPage";
+import type { Quotation, PageFormData } from "@/features/order-detail/shared/types";
 
 // モックデータ（将来的にはAPIから取得）
 const mockQuotations: Quotation[] = [
