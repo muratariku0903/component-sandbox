@@ -90,27 +90,6 @@ export function useOrderDetailForm(quotations: Quotation[]) {
     return allValid;
   }, [form, getValues, selectedQuotationId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // 全見積書をバリデーション（全行を検証、空行も含む）
-  const validateAllEntries = useCallback((): boolean => {
-    const entries = getValues("quotationEntries");
-
-    // 全エラーをクリア
-    form.clearErrors("quotationEntries");
-
-    let allValid = true;
-
-    for (let entryIdx = 0; entryIdx < entries.length; entryIdx++) {
-      const entry = entries[entryIdx];
-      for (let detailIdx = 0; detailIdx < entry.details.length; detailIdx++) {
-        if (!validateDetail(entry.details[detailIdx], entryIdx, detailIdx)) {
-          allValid = false;
-        }
-      }
-    }
-
-    return allValid;
-  }, [form, getValues]); // eslint-disable-line react-hooks/exhaustive-deps
-
   // 見積書選択
   const selectQuotation = useCallback(
     (quotationId: string) => {
@@ -221,7 +200,6 @@ export function useOrderDetailForm(quotations: Quotation[]) {
     removeDetailRow,
     resetForm,
     initializeFromSaved,
-    validateAllEntries,
     validateCurrentQuotation,
     getAllQuotationData,
   };

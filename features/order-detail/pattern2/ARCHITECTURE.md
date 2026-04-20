@@ -12,7 +12,7 @@
 | データ保持 | RHF（現在の見積書）+ useRef（他の見積書） | RHF のみ（全見積書） |
 | 見積書切替 | ref に退避 → ref から復元 → replace | selectedId を変更するだけ |
 | useFieldArray | 固定名 `"currentDetails"` 1つ | 見積書ごとに `quotationEntries.${idx}.details` |
-| バリデーション | リアルタイム活性制御（isAllFilled） | Zodクリック時検証（validateAllEntries） |
+| バリデーション | リアルタイム活性制御（isAllFilled） | Zodクリック時検証（validateCurrentQuotation） |
 | コンポーネント | DetailInputForm が直接明細行を描画 | QuotationDetailForm に委譲 |
 
 ---
@@ -27,7 +27,7 @@
 RHF quotationEntries[idx].details (useFieldArray)
     ↓  見積書切替は selectedId の変更のみ（退避/復元不要）
 RHF 内に全見積書データが常駐
-    ↓  モーダル確定時に validateAllEntries() → getAllQuotationData()
+    ↓  モーダル確定時に validateCurrentQuotation() → getAllQuotationData()
 ページレベル RHF (savedDetails に上書き)
     ↓  認可依頼ボタンで handleSubmit()
 API送信 (将来実装)
@@ -132,19 +132,21 @@ register(`quotationEntries.${quotationIndex}.details.${detailIndex}.unitPrice`, 
 
 ### 5. Zodバリデーションフロー
 
-#### 明細追加/更新ボタン押下時（validateAllEntries）
+**保存時・切替時ともに `validateCurrentQuotation`（現在表示中の見積書のみを検証）を使う。**
+他の見積書は「切替成功時の検証通過」という不変条件により常に valid が保証されているため、保存時も現在表示中の見積書だけ検証すれば十分。
+
+#### 明細追加/更新ボタン押下時
 
 ```
 ボタン押下
-  ↓ form.clearErrors("quotationEntries") で全エラーをクリア
-  ↓ 全 quotationEntries をループ
-  ↓ 各明細行（空の行も含めすべて）について validateDetail() で検証:
+  ↓ validateCurrentQuotation()
+  │   → 現在の見積書の全明細行（空の行も含む）を validateDetail() で検証
   │     └── detailItemSchema.safeParse(detail)
   │           → productName: 空でないこと
   │           → amount: 空でない・NaN でない・0 より大きい
   │   エラーあり → form.setError() でフィールド単位にセット
   ↓
-  ├── 全行 valid → 保存処理へ
+  ├── 現在の見積書 valid → 保存処理へ（他の見積書は既に valid）
   └── エラーあり → return（保存しない、エラー表示）
 ```
 
@@ -155,10 +157,17 @@ selectQuotation(newId) 呼び出し
   ↓ selectedQuotationId が存在 & newId と異なる
   ↓ validateCurrentQuotation()
   │   → 現在の見積書の全明細行（空の行も含む）を検証
-  │   → 検証ロジックは validateAllEntries と同一
   ├── 失敗: return（setSelectedQuotationId しない = 切替阻止）
   └── 成功: エラーをクリアして setSelectedQuotationId(newId)
 ```
+
+#### 不変条件（なぜ保存時も current のみで十分か）
+
+- 初期状態または `initializeFromSaved` で入るデータは、保存時に検証済みなので valid
+- UI で編集できるのは現在表示中の見積書のみ（他の見積書は RHF 内に残るが触れない）
+- 見積書切替は「元の見積書の検証に成功した場合のみ実行」→ 切替時点で元の見積書は valid
+- よって **現在表示中でない見積書のエントリは常に valid** という不変条件が成立
+- 保存時は「現在表示中の見積書」さえ検証すれば全体の valid 性が保証される
 
 #### エラー表示の仕組み
 
@@ -183,8 +192,7 @@ selectQuotation(newId) 呼び出し
 | 戻り値 | 型 | 説明 |
 |--------|------|------|
 | `selectedQuotationIndex` | `number` | 現在の見積書のインデックス（-1 = 未選択） |
-| `validateAllEntries` | `() => boolean` | 全見積書の非空明細行をZod検証。エラー時は form.setError |
-| `validateCurrentQuotation` | `() => boolean` | 現在の見積書の非空明細行をZod検証 |
+| `validateCurrentQuotation` | `() => boolean` | 現在の見積書の全明細行（空行含む）をZod検証。保存時・切替時の両方で使用 |
 
 #### 変更されたもの
 

@@ -37,7 +37,7 @@ export function AddOrderDetailModal({
     taxType,
     resetForm,
     initializeFromSaved,
-    validateAllEntries,
+    validateCurrentQuotation,
     getAllQuotationData,
   } = useOrderDetailForm(quotations);
 
@@ -65,7 +65,8 @@ export function AddOrderDetailModal({
   };
 
   const handleSave = () => {
-    if (!validateAllEntries()) return;
+    // 現在の見積書のみ検証。他の見積書は「切替成功時に検証済み」の不変条件により既に valid
+    if (!validateCurrentQuotation()) return;
 
     const allData = getAllQuotationData();
     const currentTaxType = form.getValues("taxType");

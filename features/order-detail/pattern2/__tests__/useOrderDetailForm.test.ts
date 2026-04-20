@@ -283,8 +283,9 @@ describe("useOrderDetailForm (pattern2)", () => {
     });
   });
 
-  // --- バリデーション (validateAllEntries) ---
-  describe("validateAllEntries", () => {
+  // --- バリデーション (validateCurrentQuotation) ---
+  // 保存時も切替時もこの関数で現在の見積書のみを検証する（他の見積書は切替時検証により常に valid の不変条件）
+  describe("validateCurrentQuotation", () => {
     /** エラーメッセージを検証するテストでは formState.errors の購読が必要 */
     function renderWithErrors() {
       return renderHook(() => {
@@ -304,7 +305,7 @@ describe("useOrderDetailForm (pattern2)", () => {
 
       let valid: boolean;
       act(() => {
-        valid = result.current.validateAllEntries();
+        valid = result.current.validateCurrentQuotation();
       });
 
       expect(valid!).toBe(false);
@@ -328,7 +329,7 @@ describe("useOrderDetailForm (pattern2)", () => {
 
       let valid: boolean;
       act(() => {
-        valid = result.current.validateAllEntries();
+        valid = result.current.validateCurrentQuotation();
       });
 
       expect(valid!).toBe(true);
@@ -346,7 +347,7 @@ describe("useOrderDetailForm (pattern2)", () => {
 
       let valid: boolean;
       act(() => {
-        valid = result.current.validateAllEntries();
+        valid = result.current.validateCurrentQuotation();
       });
 
       expect(valid!).toBe(false);
@@ -366,7 +367,7 @@ describe("useOrderDetailForm (pattern2)", () => {
 
       let valid: boolean;
       act(() => {
-        valid = result.current.validateAllEntries();
+        valid = result.current.validateCurrentQuotation();
       });
 
       expect(valid!).toBe(false);
@@ -390,13 +391,13 @@ describe("useOrderDetailForm (pattern2)", () => {
 
       let valid: boolean;
       act(() => {
-        valid = result.current.validateAllEntries();
+        valid = result.current.validateCurrentQuotation();
       });
 
       expect(valid!).toBe(true);
     });
 
-    it("他の見積書に空行があると false でその見積書にエラーがセットされる", () => {
+    it("現在の見積書に空行が追加されている場合は false でエラーがセットされる", () => {
       const { result } = renderWithErrors();
 
       // quote-1 を入力
@@ -423,12 +424,12 @@ describe("useOrderDetailForm (pattern2)", () => {
 
       let valid: boolean;
       act(() => {
-        valid = result.current.validateAllEntries();
+        valid = result.current.validateCurrentQuotation();
       });
 
       expect(valid!).toBe(false);
       const errors = result.current.form.formState.errors;
-      // quote-2 (entry index 1) の row 1 にエラーがセットされる
+      // 現在の見積書 quote-2 (entry index 1) の row 1 にエラーがセットされる
       expect(errors.quotationEntries?.[1]?.details?.[1]?.productName?.message).toBe("商品名は必須です");
       expect(errors.quotationEntries?.[1]?.details?.[1]?.amount?.message).toBe("金額は必須です");
     });
@@ -445,7 +446,7 @@ describe("useOrderDetailForm (pattern2)", () => {
 
       // 1回目: productName 未入力でエラー
       act(() => {
-        result.current.validateAllEntries();
+        result.current.validateCurrentQuotation();
       });
       expect(result.current.form.formState.errors.quotationEntries?.[0]?.details?.[0]?.productName).toBeDefined();
 
@@ -456,7 +457,7 @@ describe("useOrderDetailForm (pattern2)", () => {
 
       let valid: boolean;
       act(() => {
-        valid = result.current.validateAllEntries();
+        valid = result.current.validateCurrentQuotation();
       });
 
       expect(valid!).toBe(true);
