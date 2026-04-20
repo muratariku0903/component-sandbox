@@ -1,7 +1,7 @@
 import { useForm } from "react-hook-form";
 import { useState, useCallback, useMemo } from "react";
 import type { DetailItem, Quotation, SavedQuotationDetail } from "../../shared/types";
-import { detailItemSchema } from "../../shared/types";
+import { detailItemSchema, quotationDetailsSchema } from "../../shared/types";
 import type { Pattern2ModalFormData, QuotationFormEntry } from "../types";
 
 type DetailFieldName = keyof DetailItem;
@@ -43,31 +43,9 @@ export function useOrderDetailForm(quotations: Quotation[]) {
     return entries.findIndex((e) => e.quotationId === selectedQuotationId);
   }, [selectedQuotationId, getValues]);
 
-  // 明細行をZodで検証し、エラーをセットする
-  const validateDetail = (
-    detail: DetailItem,
-    entryIdx: number,
-    detailIdx: number,
-  ): boolean => {
-    let hasError = false;
-    const basePath =
-      `quotationEntries.${entryIdx}.details.${detailIdx}` as const;
-
-    // detailItemSchema で検証（productName, amount）
-    const result = detailItemSchema.safeParse(detail);
-    if (!result.success) {
-      for (const issue of result.error.issues) {
-        const fieldName = issue.path[0];
-        if (!isDetailFieldName(fieldName)) continue;
-        form.setError(`${basePath}.${fieldName}`, { message: issue.message });
-        hasError = true;
-      }
-    }
-
-    return !hasError;
-  };
-
-  // 現在の見積書をバリデーション（全行を検証、空行も含む）
+  // 現在の見積書をバリデーション（全行を検証、空行も含む）。
+  // 検証ロジックは quotationDetailsSchema（shared/types.ts）に集約されており、
+  // ここでは Zod の結果を RHF の setError に流し込むだけ。
   const validateCurrentQuotation = useCallback((): boolean => {
     const entries = getValues("quotationEntries");
     const currentIdx = entries.findIndex(
@@ -75,19 +53,24 @@ export function useOrderDetailForm(quotations: Quotation[]) {
     );
     if (currentIdx === -1) return true;
 
-    // 該当パスのエラーをクリア
     form.clearErrors(`quotationEntries.${currentIdx}.details`);
 
-    const currentEntry = entries[currentIdx];
-    let allValid = true;
+    const result = quotationDetailsSchema.safeParse(entries[currentIdx].details);
+    if (result.success) return true;
 
-    for (let i = 0; i < currentEntry.details.length; i++) {
-      if (!validateDetail(currentEntry.details[i], currentIdx, i)) {
-        allValid = false;
-      }
+    for (const issue of result.error.issues) {
+      // issue.path = [detailIndex, fieldName]
+      const detailIdx = issue.path[0];
+      const fieldName = issue.path[1];
+      if (typeof detailIdx !== "number" || !isDetailFieldName(fieldName)) continue;
+
+      form.setError(
+        `quotationEntries.${currentIdx}.details.${detailIdx}.${fieldName}`,
+        { message: issue.message }
+      );
     }
 
-    return allValid;
+    return false;
   }, [form, getValues, selectedQuotationId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // 見積書選択

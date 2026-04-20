@@ -132,34 +132,40 @@ register(`quotationEntries.${quotationIndex}.details.${detailIndex}.unitPrice`, 
 
 ### 5. Zodバリデーションフロー
 
-**保存時・切替時ともに `validateCurrentQuotation`（現在表示中の見積書のみを検証）を使う。**
-他の見積書は「切替成功時の検証通過」という不変条件により常に valid が保証されているため、保存時も現在表示中の見積書だけ検証すれば十分。
+**検証ルールは `shared/types.ts` の Zod スキーマに集約する。**
+フック (`useOrderDetailForm`) は検証ロジックを持たず、Zod の結果を RHF の `setError` に流し込むだけ。
 
-#### 明細追加/更新ボタン押下時
+#### スキーマ階層
 
-```
-ボタン押下
-  ↓ validateCurrentQuotation()
-  │   → 現在の見積書の全明細行（空の行も含む）を validateDetail() で検証
-  │     └── detailItemSchema.safeParse(detail)
-  │           → productName: 空でないこと
-  │           → amount: 空でない・NaN でない・0 より大きい
-  │   エラーあり → form.setError() でフィールド単位にセット
-  ↓
-  ├── 現在の見積書 valid → 保存処理へ（他の見積書は既に valid）
-  └── エラーあり → return（保存しない、エラー表示）
-```
+| スキーマ | 内容 |
+|---------|------|
+| `detailItemSchema` | 明細1行。`productName.min(1)` と `amount.refine(positive)` で必須チェック |
+| `quotationDetailsSchema` | `z.array(detailItemSchema)`。Zod が配列 iterate を担い、issue.path = `[detailIndex, fieldName]` で返す |
 
-#### 見積書切替時（validateCurrentQuotation）
+クロス行/クロスフィールドの検証（合計金額チェックなど）が将来必要になれば `quotationDetailsSchema` に `.superRefine()` を追加する。
+
+#### 明細追加/更新ボタン押下時・見積書切替時（共通：validateCurrentQuotation）
 
 ```
-selectQuotation(newId) 呼び出し
-  ↓ selectedQuotationId が存在 & newId と異なる
-  ↓ validateCurrentQuotation()
-  │   → 現在の見積書の全明細行（空の行も含む）を検証
-  ├── 失敗: return（setSelectedQuotationId しない = 切替阻止）
-  └── 成功: エラーをクリアして setSelectedQuotationId(newId)
+呼び出し
+  ↓ form.clearErrors でこの見積書のエラーをクリア
+  ↓ quotationDetailsSchema.safeParse(currentEntry.details)
+  │   Zod が全行を iterate し、各 issue.path = [detailIndex, fieldName] を生成
+  ├── success: true
+  └── !success: 各 issue を RHF の setError に流し込む
+        → path: quotationEntries.${currentIdx}.details.${detailIdx}.${fieldName}
+        → message: issue.message（スキーマ側で定義）
 ```
+
+保存時: 失敗→保存中断、成功→保存処理へ
+切替時: 失敗→切替阻止、成功→ setSelectedQuotationId(newId)
+
+#### 不変条件（なぜ保存時も current のみで十分か）
+
+- 初期状態または `initializeFromSaved` で入るデータは、保存時に検証済みなので valid
+- UI で編集できるのは現在表示中の見積書のみ（他の見積書は RHF 内に残るが触れない）
+- 見積書切替は「元の見積書の検証に成功した場合のみ実行」→ 切替時点で元の見積書は valid
+- よって **現在表示中でない見積書のエントリは常に valid** という不変条件が成立
 
 #### 不変条件（なぜ保存時も current のみで十分か）
 
