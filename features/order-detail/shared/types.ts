@@ -4,7 +4,7 @@ import { z } from "zod";
 export type TaxType = "tax_exclusive" | "tax_inclusive";
 
 /** 税率 */
-export type TaxRate = 8 | 10;
+export type TaxRate = 0 | 8 | 10;
 
 /** 見積書 */
 export interface Quotation {
@@ -42,7 +42,7 @@ export const detailItemSchema = z.object({
   modelNumber: z.string(),
   unitPrice: z.union([z.number(), z.literal(""), z.nan()]),
   quantity: z.union([z.number(), z.literal(""), z.nan()]),
-  taxRate: z.union([z.literal(8), z.literal(10), z.literal(""), z.nan()]),
+  taxRate: z.union([z.literal(0), z.literal(8), z.literal(10), z.literal(""), z.nan()]),
   amount: z
     .union([z.number(), z.literal(""), z.nan()])
     .refine((val) => val !== "" && !Number.isNaN(val) && Number(val) > 0, {

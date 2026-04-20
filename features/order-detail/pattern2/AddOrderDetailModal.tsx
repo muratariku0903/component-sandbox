@@ -37,12 +37,14 @@ export function AddOrderDetailModal({
     taxType,
     resetForm,
     initializeFromSaved,
-    isAllFilled,
+    validateAllEntries,
     getAllQuotationData,
   } = useOrderDetailForm(quotations);
 
-  // フォーム値の変更で再レンダリング → isAllFilled() を再評価
+  // フォーム値の変更・エラー変更で再レンダリング
   form.watch();
+  // エラー変更の購読（見積書切替ブロック時にセレクトを元の値に戻すため）
+  const _errors = form.formState.errors; // eslint-disable-line @typescript-eslint/no-unused-vars
 
   // モーダルオープン時に保存済みデータがあれば初期化
   const prevOpenRef = useRef(false);
@@ -63,6 +65,8 @@ export function AddOrderDetailModal({
   };
 
   const handleSave = () => {
+    if (!validateAllEntries()) return;
+
     const allData = getAllQuotationData();
     const currentTaxType = form.getValues("taxType");
     const results: SavedQuotationDetail[] = [];
@@ -130,7 +134,6 @@ export function AddOrderDetailModal({
                 quotationId={selectedQuotationId}
                 form={form}
                 quotationIndex={selectedQuotationIndex}
-                taxType={taxType}
               />
             </GridItem>
           </Grid>
@@ -143,7 +146,6 @@ export function AddOrderDetailModal({
           <Button
             colorPalette="blue"
             onClick={handleSave}
-            disabled={!isAllFilled()}
           >
             {isEditing ? "更新" : "明細追加"}
           </Button>

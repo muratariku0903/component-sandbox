@@ -45,10 +45,10 @@ describe("AddOrderDetailModal (pattern2)", () => {
       ).toBeInTheDocument();
     });
 
-    it("明細追加ボタンが非活性である", () => {
+    it("明細追加ボタンが常に活性である", () => {
       renderModal();
       const submitBtn = screen.getByRole("button", { name: "明細追加" });
-      expect(submitBtn).toBeDisabled();
+      expect(submitBtn).not.toBeDisabled();
     });
 
     it("税区分の初期値が税抜である", () => {
@@ -108,42 +108,68 @@ describe("AddOrderDetailModal (pattern2)", () => {
     });
   });
 
-  // --- 税率フィールドの制御 ---
-  describe("税率フィールドの制御", () => {
-    it("税抜の場合、税率セレクトが非活性である", async () => {
+  // --- 税率フィールド ---
+  describe("税率フィールド", () => {
+    it("税区分に関わらず税率セレクトは常に活性である", async () => {
       const user = userEvent.setup();
       renderModal();
 
       await user.selectOptions(screen.getByRole("combobox"), "quote-1");
 
-      const taxRateSelects = screen.getAllByRole("combobox");
-      const taxRateSelect = taxRateSelects.find(
-        (el) => el.querySelector('option[value="8"]') !== null
-      );
-      expect(taxRateSelect).toBeDisabled();
-    });
+      const findTaxRateSelect = () => {
+        const selects = screen.getAllByRole("combobox");
+        return selects.find(
+          (el) => el.querySelector('option[value="8"]') !== null
+        );
+      };
 
-    it("税込に切り替えると税率セレクトが活性になる", async () => {
-      const user = userEvent.setup();
-      renderModal();
+      // 税抜（初期値）
+      expect(findTaxRateSelect()).not.toBeDisabled();
 
-      await user.selectOptions(screen.getByRole("combobox"), "quote-1");
-
+      // 税込に切替
       await user.click(screen.getByLabelText("税込"));
-
-      const taxRateSelects = screen.getAllByRole("combobox");
-      const taxRateSelect = taxRateSelects.find(
-        (el) => el.querySelector('option[value="8"]') !== null
-      );
-      expect(taxRateSelect).not.toBeDisabled();
+      expect(findTaxRateSelect()).not.toBeDisabled();
     });
   });
 
-  // --- 明細追加ボタンの活性/非活性 ---
-  describe("明細追加ボタンの活性制御", () => {
-    it("全フィールド入力後に明細追加ボタンが活性になる", async () => {
+  // --- バリデーション ---
+  describe("バリデーション", () => {
+    it("未入力で明細追加クリック時、バリデーションエラーが表示されonSaveが呼ばれない", async () => {
       const user = userEvent.setup();
-      renderModal();
+      const { onSave } = renderModal();
+
+      // 見積書を選択して商品名だけ入力（amountが空）
+      await user.selectOptions(screen.getByRole("combobox"), "quote-1");
+      await user.type(screen.getByPlaceholderText("商品名"), "テスト商品");
+
+      const submitBtn = screen.getByRole("button", { name: "明細追加" });
+      await user.click(submitBtn);
+
+      // バリデーションエラーが表示される
+      expect(screen.getByText("金額は必須です")).toBeInTheDocument();
+      expect(onSave).not.toHaveBeenCalled();
+    });
+
+    it("商品名未入力でバリデーションエラーが表示される", async () => {
+      const user = userEvent.setup();
+      const { onSave } = renderModal();
+
+      await user.selectOptions(screen.getByRole("combobox"), "quote-1");
+
+      // 金額のみ入力（商品名が空）
+      const numberInputs = screen.getAllByPlaceholderText("0");
+      await user.type(numberInputs[2], "1000"); // amount
+
+      const submitBtn = screen.getByRole("button", { name: "明細追加" });
+      await user.click(submitBtn);
+
+      expect(screen.getByText("商品名は必須です")).toBeInTheDocument();
+      expect(onSave).not.toHaveBeenCalled();
+    });
+
+    it("全フィールド正しく入力するとバリデーション通過して保存される", async () => {
+      const user = userEvent.setup();
+      const { onSave, onClose } = renderModal();
 
       await user.selectOptions(screen.getByRole("combobox"), "quote-1");
 
@@ -151,23 +177,82 @@ describe("AddOrderDetailModal (pattern2)", () => {
       await user.type(screen.getByPlaceholderText("型番号"), "ABC-123");
 
       const numberInputs = screen.getAllByPlaceholderText("0");
-      await user.type(numberInputs[0], "100");
-      await user.type(numberInputs[1], "10");
-      await user.type(numberInputs[2], "1000");
+      await user.type(numberInputs[0], "100");  // unitPrice
+      await user.type(numberInputs[1], "10");   // quantity
+      await user.type(numberInputs[2], "1000"); // amount
 
       const submitBtn = screen.getByRole("button", { name: "明細追加" });
-      expect(submitBtn).not.toBeDisabled();
+      await user.click(submitBtn);
+
+      expect(onSave).toHaveBeenCalledTimes(1);
+      expect(onClose).toHaveBeenCalledTimes(1);
     });
 
-    it("一部フィールドのみ入力では非活性のまま", async () => {
+    it("空の明細行が残っているとバリデーションエラーで保存できない", async () => {
+      const user = userEvent.setup();
+      const { onSave } = renderModal();
+
+      await user.selectOptions(screen.getByRole("combobox"), "quote-1");
+
+      // 1行目を正しく入力
+      const productNameInputs = screen.getAllByPlaceholderText("商品名");
+      await user.type(productNameInputs[0], "テスト商品");
+      const numberInputs = screen.getAllByPlaceholderText("0");
+      await user.type(numberInputs[2], "1000"); // 1行目のamount
+
+      // 明細行を追加（2行目は空のまま）
+      await user.click(screen.getByRole("button", { name: /明細を追加/ }));
+
+      const submitBtn = screen.getByRole("button", { name: "明細追加" });
+      await user.click(submitBtn);
+
+      // 空行があるため保存ブロック、必須エラーが表示される
+      expect(onSave).not.toHaveBeenCalled();
+      expect(screen.getByText("商品名は必須です")).toBeInTheDocument();
+      expect(screen.getByText("金額は必須です")).toBeInTheDocument();
+    });
+  });
+
+  // --- 見積書切替時のバリデーション ---
+  describe("見積書切替時のバリデーション", () => {
+    it("入力途中の見積書から別の見積書に切替えるとバリデーションエラーが表示される", async () => {
       const user = userEvent.setup();
       renderModal();
 
-      await user.selectOptions(screen.getByRole("combobox"), "quote-1");
+      const select = screen.getByRole("combobox");
+      await user.selectOptions(select, "quote-1");
+
+      // 商品名だけ入力（amountが空 → 不正）
       await user.type(screen.getByPlaceholderText("商品名"), "テスト商品");
 
-      const submitBtn = screen.getByRole("button", { name: "明細追加" });
-      expect(submitBtn).toBeDisabled();
+      // 見積書2に切替を試みる
+      await user.selectOptions(select, "quote-2");
+
+      // バリデーションエラーが表示される
+      expect(screen.getByText("金額は必須です")).toBeInTheDocument();
+      // 見積書1のままとどまる（明細1が表示されたまま）
+      expect(screen.getByText("明細 1")).toBeInTheDocument();
+    });
+
+    it("正しく入力された見積書から別の見積書に切替えできる", async () => {
+      const user = userEvent.setup();
+      renderModal();
+
+      const select = screen.getByRole("combobox");
+      await user.selectOptions(select, "quote-1");
+
+      // 全必須フィールドを入力
+      await user.type(screen.getByPlaceholderText("商品名"), "テスト商品");
+      const numberInputs = screen.getAllByPlaceholderText("0");
+      await user.type(numberInputs[2], "1000"); // amount
+
+      // 見積書2に切替
+      await user.selectOptions(select, "quote-2");
+
+      // 新しい空の明細行が表示される
+      expect(screen.getByText("明細 1")).toBeInTheDocument();
+      const productNameInput = screen.getByPlaceholderText("商品名");
+      expect(productNameInput).toHaveValue("");
     });
   });
 

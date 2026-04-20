@@ -63,7 +63,7 @@ describe("useOrderDetailForm (pattern2)", () => {
       expect(getCurrentDetailCount(result)).toBe(1);
     });
 
-    it("別の見積書に切り替えると空の明細1行が表示される", () => {
+    it("入力済みの見積書から別の見積書に切り替えられる", () => {
       const { result } = renderHook(() =>
         useOrderDetailForm(mockQuotations)
       );
@@ -72,9 +72,9 @@ describe("useOrderDetailForm (pattern2)", () => {
         result.current.selectQuotation("quote-1");
       });
       act(() => {
-        result.current.addDetailRow();
+        setDetailValue(result, 0, "productName", "商品A");
+        setDetailValue(result, 0, "amount", 1000);
       });
-      expect(getCurrentDetailCount(result)).toBe(2);
 
       act(() => {
         result.current.selectQuotation("quote-2");
@@ -92,11 +92,24 @@ describe("useOrderDetailForm (pattern2)", () => {
       act(() => {
         result.current.selectQuotation("quote-1");
       });
+      // quote-1 は3行すべて入力（空行があると切替できない）
+      act(() => {
+        setDetailValue(result, 0, "productName", "商品A1");
+        setDetailValue(result, 0, "amount", 1000);
+      });
       act(() => {
         result.current.addDetailRow();
       });
       act(() => {
+        setDetailValue(result, 1, "productName", "商品A2");
+        setDetailValue(result, 1, "amount", 2000);
+      });
+      act(() => {
         result.current.addDetailRow();
+      });
+      act(() => {
+        setDetailValue(result, 2, "productName", "商品A3");
+        setDetailValue(result, 2, "amount", 3000);
       });
       expect(getCurrentDetailCount(result)).toBe(3);
 
@@ -104,6 +117,12 @@ describe("useOrderDetailForm (pattern2)", () => {
         result.current.selectQuotation("quote-2");
       });
       expect(getCurrentDetailCount(result)).toBe(1);
+
+      // quote-2 も入力してから quote-3 へ切替
+      act(() => {
+        setDetailValue(result, 0, "productName", "商品B");
+        setDetailValue(result, 0, "amount", 2000);
+      });
 
       act(() => {
         result.current.selectQuotation("quote-3");
@@ -125,10 +144,17 @@ describe("useOrderDetailForm (pattern2)", () => {
       act(() => {
         setDetailValue(result, 0, "productName", "テスト商品");
         setDetailValue(result, 0, "modelNumber", "ABC-123");
+        setDetailValue(result, 0, "amount", 1000);
       });
 
       act(() => {
         result.current.selectQuotation("quote-2");
+      });
+
+      // quote-2 を入力しないと quote-1 に戻れないため、必須フィールドを入力
+      act(() => {
+        setDetailValue(result, 0, "productName", "商品B");
+        setDetailValue(result, 0, "amount", 2000);
       });
 
       act(() => {
@@ -148,8 +174,17 @@ describe("useOrderDetailForm (pattern2)", () => {
       act(() => {
         result.current.selectQuotation("quote-1");
       });
+      // quote-1 は2行とも入力（空行があると切替できない）
+      act(() => {
+        setDetailValue(result, 0, "productName", "商品A1");
+        setDetailValue(result, 0, "amount", 1000);
+      });
       act(() => {
         result.current.addDetailRow();
+      });
+      act(() => {
+        setDetailValue(result, 1, "productName", "商品A2");
+        setDetailValue(result, 1, "amount", 2000);
       });
       expect(getCurrentDetailCount(result)).toBe(2);
 
@@ -157,6 +192,12 @@ describe("useOrderDetailForm (pattern2)", () => {
         result.current.selectQuotation("quote-2");
       });
       expect(getCurrentDetailCount(result)).toBe(1);
+
+      // quote-2 も入力してから quote-1 へ戻す
+      act(() => {
+        setDetailValue(result, 0, "productName", "商品B");
+        setDetailValue(result, 0, "amount", 2000);
+      });
 
       act(() => {
         result.current.selectQuotation("quote-1");
@@ -219,18 +260,34 @@ describe("useOrderDetailForm (pattern2)", () => {
     });
   });
 
-  // --- バリデーション (isAllFilled) ---
-  describe("明細追加ボタンのバリデーション", () => {
-    it("何も入力していない場合は false", () => {
-      const { result } = renderHook(() =>
-        useOrderDetailForm(mockQuotations)
-      );
+  // --- バリデーション (validateAllEntries) ---
+  describe("validateAllEntries", () => {
+    /** エラーメッセージを検証するテストでは formState.errors の購読が必要 */
+    function renderWithErrors() {
+      return renderHook(() => {
+        const hookResult = useOrderDetailForm(mockQuotations);
+        // formState.errors を購読してsetError時に再レンダリングを発火
+        hookResult.form.formState.errors; // eslint-disable-line @typescript-eslint/no-unused-expressions
+        return hookResult;
+      });
+    }
+
+    it("空の明細行のみの場合は false で必須フィールドにエラーがセットされる", () => {
+      const { result } = renderWithErrors();
 
       act(() => {
         result.current.selectQuotation("quote-1");
       });
 
-      expect(result.current.isAllFilled()).toBe(false);
+      let valid: boolean;
+      act(() => {
+        valid = result.current.validateAllEntries();
+      });
+
+      expect(valid!).toBe(false);
+      const errors = result.current.form.formState.errors;
+      expect(errors.quotationEntries?.[0]?.details?.[0]?.productName?.message).toBe("商品名は必須です");
+      expect(errors.quotationEntries?.[0]?.details?.[0]?.amount?.message).toBe("金額は必須です");
     });
 
     it("税抜で必須フィールド入力済みなら true", () => {
@@ -246,13 +303,36 @@ describe("useOrderDetailForm (pattern2)", () => {
         setDetailValue(result, 0, "amount", 1000);
       });
 
-      expect(result.current.isAllFilled()).toBe(true);
+      let valid: boolean;
+      act(() => {
+        valid = result.current.validateAllEntries();
+      });
+
+      expect(valid!).toBe(true);
     });
 
-    it("一部フィールドのみ入力は false", () => {
-      const { result } = renderHook(() =>
-        useOrderDetailForm(mockQuotations)
-      );
+    it("商品名が未入力なら false でエラーがセットされる", () => {
+      const { result } = renderWithErrors();
+
+      act(() => {
+        result.current.selectQuotation("quote-1");
+      });
+      act(() => {
+        setDetailValue(result, 0, "amount", 1000);
+      });
+
+      let valid: boolean;
+      act(() => {
+        valid = result.current.validateAllEntries();
+      });
+
+      expect(valid!).toBe(false);
+      const errors = result.current.form.formState.errors;
+      expect(errors.quotationEntries?.[0]?.details?.[0]?.productName?.message).toBe("商品名は必須です");
+    });
+
+    it("金額が未入力なら false でエラーがセットされる", () => {
+      const { result } = renderWithErrors();
 
       act(() => {
         result.current.selectQuotation("quote-1");
@@ -261,10 +341,17 @@ describe("useOrderDetailForm (pattern2)", () => {
         setDetailValue(result, 0, "productName", "商品A");
       });
 
-      expect(result.current.isAllFilled()).toBe(false);
+      let valid: boolean;
+      act(() => {
+        valid = result.current.validateAllEntries();
+      });
+
+      expect(valid!).toBe(false);
+      const errors = result.current.form.formState.errors;
+      expect(errors.quotationEntries?.[0]?.details?.[0]?.amount?.message).toBe("金額は必須です");
     });
 
-    it("税込の場合、税率未選択なら false", () => {
+    it("税込で必須フィールド入力済みなら true（税率はデフォルト10%で常に有効）", () => {
       const { result } = renderHook(() =>
         useOrderDetailForm(mockQuotations)
       );
@@ -278,32 +365,18 @@ describe("useOrderDetailForm (pattern2)", () => {
         setDetailValue(result, 0, "amount", 1000);
       });
 
-      expect(result.current.isAllFilled()).toBe(false);
-    });
-
-    it("税込で税率も選択済みなら true", () => {
-      const { result } = renderHook(() =>
-        useOrderDetailForm(mockQuotations)
-      );
-
+      let valid: boolean;
       act(() => {
-        result.current.selectQuotation("quote-1");
-      });
-      act(() => {
-        result.current.form.setValue("taxType", "tax_inclusive");
-        setDetailValue(result, 0, "productName", "商品A");
-        setDetailValue(result, 0, "amount", 1000);
-        setDetailValue(result, 0, "taxRate", 10);
+        valid = result.current.validateAllEntries();
       });
 
-      expect(result.current.isAllFilled()).toBe(true);
+      expect(valid!).toBe(true);
     });
 
-    it("現在表示中の見積書が空なら false", () => {
-      const { result } = renderHook(() =>
-        useOrderDetailForm(mockQuotations)
-      );
+    it("他の見積書に空行があると false でその見積書にエラーがセットされる", () => {
+      const { result } = renderWithErrors();
 
+      // quote-1 を入力
       act(() => {
         result.current.selectQuotation("quote-1");
       });
@@ -311,87 +384,112 @@ describe("useOrderDetailForm (pattern2)", () => {
         setDetailValue(result, 0, "productName", "商品A");
         setDetailValue(result, 0, "amount", 1000);
       });
-
+      // quote-2 に切替（quote-1 が valid なので切替成功）
       act(() => {
         result.current.selectQuotation("quote-2");
       });
-
-      expect(result.current.isAllFilled()).toBe(false);
-    });
-
-    it("空の見積書から入力済み見積書に戻ると true", () => {
-      const { result } = renderHook(() =>
-        useOrderDetailForm(mockQuotations)
-      );
-
-      act(() => {
-        result.current.selectQuotation("quote-1");
-      });
-      act(() => {
-        setDetailValue(result, 0, "productName", "商品A");
-        setDetailValue(result, 0, "amount", 1000);
-      });
-
-      act(() => {
-        result.current.selectQuotation("quote-2");
-      });
-      expect(result.current.isAllFilled()).toBe(false);
-
-      act(() => {
-        result.current.selectQuotation("quote-1");
-      });
-      expect(result.current.isAllFilled()).toBe(true);
-    });
-
-    it("他の見積書の空の明細はスキップされる（NaN含む）", () => {
-      const { result } = renderHook(() =>
-        useOrderDetailForm(mockQuotations)
-      );
-
-      act(() => {
-        result.current.selectQuotation("quote-2");
-      });
-      act(() => {
-        setDetailValue(result, 0, "unitPrice", NaN);
-        setDetailValue(result, 0, "quantity", NaN);
-        setDetailValue(result, 0, "amount", NaN);
-      });
-
-      act(() => {
-        result.current.selectQuotation("quote-1");
-      });
-      act(() => {
-        setDetailValue(result, 0, "productName", "商品A");
-        setDetailValue(result, 0, "amount", 1000);
-      });
-
-      expect(result.current.isAllFilled()).toBe(true);
-    });
-
-    it("入力済みの見積書がある状態で、別の見積書が入力途中なら false", () => {
-      const { result } = renderHook(() =>
-        useOrderDetailForm(mockQuotations)
-      );
-
-      act(() => {
-        result.current.selectQuotation("quote-1");
-      });
-      act(() => {
-        setDetailValue(result, 0, "productName", "商品A");
-        setDetailValue(result, 0, "amount", 1000);
-      });
-
-      act(() => {
-        result.current.selectQuotation("quote-2");
-      });
+      // quote-2 を入力
       act(() => {
         setDetailValue(result, 0, "productName", "商品B");
+        setDetailValue(result, 0, "amount", 2000);
+      });
+      // quote-2 で空行を追加（保存はブロックされるはず）
+      act(() => {
+        result.current.addDetailRow();
       });
 
-      expect(result.current.isAllFilled()).toBe(false);
+      let valid: boolean;
+      act(() => {
+        valid = result.current.validateAllEntries();
+      });
+
+      expect(valid!).toBe(false);
+      const errors = result.current.form.formState.errors;
+      // quote-2 (entry index 1) の row 1 にエラーがセットされる
+      expect(errors.quotationEntries?.[1]?.details?.[1]?.productName?.message).toBe("商品名は必須です");
+      expect(errors.quotationEntries?.[1]?.details?.[1]?.amount?.message).toBe("金額は必須です");
     });
 
-    it("非表示の見積書に入力済み明細と空の明細が混在する場合は false", () => {
+    it("再バリデーション時に前回のエラーがクリアされる", () => {
+      const { result } = renderWithErrors();
+
+      act(() => {
+        result.current.selectQuotation("quote-1");
+      });
+      act(() => {
+        setDetailValue(result, 0, "amount", 1000);
+      });
+
+      // 1回目: productName 未入力でエラー
+      act(() => {
+        result.current.validateAllEntries();
+      });
+      expect(result.current.form.formState.errors.quotationEntries?.[0]?.details?.[0]?.productName).toBeDefined();
+
+      // productName を入力して再バリデーション
+      act(() => {
+        setDetailValue(result, 0, "productName", "商品A");
+      });
+
+      let valid: boolean;
+      act(() => {
+        valid = result.current.validateAllEntries();
+      });
+
+      expect(valid!).toBe(true);
+      expect(result.current.form.formState.errors.quotationEntries).toBeUndefined();
+    });
+  });
+
+  // --- 見積書切替時のバリデーション ---
+  describe("見積書切替時のバリデーション", () => {
+    /** エラーメッセージを検証するテストでは formState.errors の購読が必要 */
+    function renderWithErrors() {
+      return renderHook(() => {
+        const hookResult = useOrderDetailForm(mockQuotations);
+        hookResult.form.formState.errors; // eslint-disable-line @typescript-eslint/no-unused-expressions
+        return hookResult;
+      });
+    }
+
+    it("バリデーション失敗時は切替が阻止される", () => {
+      const { result } = renderWithErrors();
+
+      act(() => {
+        result.current.selectQuotation("quote-1");
+      });
+      act(() => {
+        setDetailValue(result, 0, "productName", "商品A");
+        // amount 未入力 → バリデーション失敗
+      });
+
+      act(() => {
+        result.current.selectQuotation("quote-2");
+      });
+
+      // 切替が阻止される
+      expect(result.current.selectedQuotationId).toBe("quote-1");
+    });
+
+    it("バリデーション失敗時にエラーがセットされる", () => {
+      const { result } = renderWithErrors();
+
+      act(() => {
+        result.current.selectQuotation("quote-1");
+      });
+      act(() => {
+        setDetailValue(result, 0, "productName", "商品A");
+      });
+
+      act(() => {
+        result.current.selectQuotation("quote-2");
+      });
+
+      const errors = result.current.form.formState.errors;
+      expect(errors.quotationEntries?.[0]?.details?.[0]?.amount?.message).toBe("金額は必須です");
+    });
+
+    it("バリデーション成功時は切替できる", () => {
       const { result } = renderHook(() =>
         useOrderDetailForm(mockQuotations)
       );
@@ -407,19 +505,68 @@ describe("useOrderDetailForm (pattern2)", () => {
       act(() => {
         result.current.selectQuotation("quote-2");
       });
+
+      expect(result.current.selectedQuotationId).toBe("quote-2");
+    });
+
+    it("空の明細行のみの見積書からは切替が阻止され、最初の行に必須エラーがセットされる", () => {
+      const { result } = renderWithErrors();
+
       act(() => {
-        setDetailValue(result, 0, "productName", "商品B");
+        result.current.selectQuotation("quote-1");
+      });
+
+      act(() => {
+        result.current.selectQuotation("quote-2");
+      });
+
+      // 切替が阻止される
+      expect(result.current.selectedQuotationId).toBe("quote-1");
+      // 最初の行に必須エラーがセットされる
+      const errors = result.current.form.formState.errors;
+      expect(errors.quotationEntries?.[0]?.details?.[0]?.productName?.message).toBe("商品名は必須です");
+      expect(errors.quotationEntries?.[0]?.details?.[0]?.amount?.message).toBe("金額は必須です");
+    });
+
+    it("行1入力済 + 空の行2が追加された状態では切替が阻止され、行2にエラーがセットされる", () => {
+      const { result } = renderWithErrors();
+
+      act(() => {
+        result.current.selectQuotation("quote-1");
+      });
+      // 行1だけ正しく入力
+      act(() => {
+        setDetailValue(result, 0, "productName", "商品A");
         setDetailValue(result, 0, "amount", 1000);
       });
+      // 空の行2を追加
       act(() => {
         result.current.addDetailRow();
       });
 
       act(() => {
+        result.current.selectQuotation("quote-2");
+      });
+
+      // 切替が阻止される
+      expect(result.current.selectedQuotationId).toBe("quote-1");
+      // 行2に必須エラー、行1はエラーなし
+      const errors = result.current.form.formState.errors;
+      expect(errors.quotationEntries?.[0]?.details?.[0]?.productName).toBeUndefined();
+      expect(errors.quotationEntries?.[0]?.details?.[1]?.productName?.message).toBe("商品名は必須です");
+      expect(errors.quotationEntries?.[0]?.details?.[1]?.amount?.message).toBe("金額は必須です");
+    });
+
+    it("初回選択時はバリデーションなしで選択できる", () => {
+      const { result } = renderHook(() =>
+        useOrderDetailForm(mockQuotations)
+      );
+
+      act(() => {
         result.current.selectQuotation("quote-1");
       });
 
-      expect(result.current.isAllFilled()).toBe(false);
+      expect(result.current.selectedQuotationId).toBe("quote-1");
     });
   });
 
@@ -487,6 +634,7 @@ describe("useOrderDetailForm (pattern2)", () => {
       act(() => {
         setDetailValue(result, 0, "productName", "商品A");
         setDetailValue(result, 0, "modelNumber", "M-001");
+        setDetailValue(result, 0, "amount", 1000);
       });
 
       act(() => {
@@ -495,6 +643,7 @@ describe("useOrderDetailForm (pattern2)", () => {
       act(() => {
         setDetailValue(result, 0, "productName", "商品B");
         setDetailValue(result, 0, "modelNumber", "M-002");
+        setDetailValue(result, 0, "amount", 2000);
       });
 
       let allData: Record<string, DetailItem[]>;
