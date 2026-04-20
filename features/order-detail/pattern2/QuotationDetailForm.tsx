@@ -11,11 +11,13 @@ import { LuPlus, LuTrash2 } from "react-icons/lu";
 interface QuotationDetailFormProps {
   form: UseFormReturn<Pattern2ModalFormData>;
   quotationIndex: number;
+  disabled?: boolean;
 }
 
 export function QuotationDetailForm({
   form,
   quotationIndex,
+  disabled = false,
 }: QuotationDetailFormProps) {
   const { control, register, formState: { errors } } = form;
   const basePath = `quotationEntries.${quotationIndex}.details` as const;
@@ -73,6 +75,7 @@ export function QuotationDetailForm({
                   variant="ghost"
                   colorPalette="red"
                   onClick={() => removeRow(index)}
+                  disabled={disabled}
                 >
                   <LuTrash2 />
                 </IconButton>
@@ -90,6 +93,7 @@ export function QuotationDetailForm({
                 <Input
                   {...register(`${basePath}.${index}.productName`)}
                   placeholder="商品名"
+                  disabled={disabled}
                 />
               </Field>
 
@@ -97,6 +101,7 @@ export function QuotationDetailForm({
                 <Input
                   {...register(`${basePath}.${index}.modelNumber`)}
                   placeholder="型番号"
+                  disabled={disabled}
                 />
               </Field>
             </HStack>
@@ -109,6 +114,7 @@ export function QuotationDetailForm({
                     valueAsNumber: true,
                   })}
                   placeholder="0"
+                  disabled={disabled}
                 />
               </Field>
 
@@ -119,6 +125,7 @@ export function QuotationDetailForm({
                     valueAsNumber: true,
                   })}
                   placeholder="0"
+                  disabled={disabled}
                 />
               </Field>
 
@@ -129,7 +136,7 @@ export function QuotationDetailForm({
                 invalid={!!fieldErrors?.taxRate}
                 errorText={fieldErrors?.taxRate?.message}
               >
-                <NativeSelectRoot>
+                <NativeSelectRoot disabled={disabled}>
                   <NativeSelectField
                     {...register(`${basePath}.${index}.taxRate`, {
                       valueAsNumber: true,
@@ -156,6 +163,7 @@ export function QuotationDetailForm({
                     valueAsNumber: true,
                   })}
                   placeholder="0"
+                  disabled={disabled}
                 />
               </Field>
             </HStack>
@@ -168,6 +176,7 @@ export function QuotationDetailForm({
         size="sm"
         onClick={addRow}
         alignSelf="flex-start"
+        disabled={disabled}
       >
         <LuPlus />
         明細を追加
