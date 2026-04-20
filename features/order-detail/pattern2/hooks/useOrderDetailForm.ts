@@ -130,22 +130,20 @@ export function useOrderDetailForm(quotations: Quotation[]) {
       }
 
       const entries = getValues("quotationEntries");
-      const exists = entries.some((e) => e.quotationId === quotationId);
+      // 未選択時の表示用ダミー（quotationId === ""）は選択が発生した時点で役割終了なので除去
+      const entriesWithoutDummy = entries.filter((e) => e.quotationId !== "");
+      const exists = entriesWithoutDummy.some(
+        (e) => e.quotationId === quotationId
+      );
 
       if (!exists) {
-        // 未選択時の表示用ダミー（quotationId === ""）が残っていれば claim して再利用
-        const dummyIdx = entries.findIndex((e) => e.quotationId === "");
-        if (dummyIdx !== -1) {
-          const claimed = entries.map((e, i) =>
-            i === dummyIdx ? { ...e, quotationId } : e
-          );
-          form.setValue("quotationEntries", claimed);
-        } else {
-          form.setValue("quotationEntries", [
-            ...entries,
-            { quotationId, details: [createEmptyDetail()] },
-          ]);
-        }
+        form.setValue("quotationEntries", [
+          ...entriesWithoutDummy,
+          { quotationId, details: [createEmptyDetail()] },
+        ]);
+      } else if (entriesWithoutDummy.length !== entries.length) {
+        // 既存だが、ダミーが残っていれば除去
+        form.setValue("quotationEntries", entriesWithoutDummy);
       }
 
       setSelectedQuotationId(quotationId);

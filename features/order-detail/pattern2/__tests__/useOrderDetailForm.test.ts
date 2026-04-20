@@ -69,7 +69,7 @@ describe("useOrderDetailForm (pattern2)", () => {
       expect(getCurrentDetailCount(result)).toBe(1);
     });
 
-    it("最初の見積書選択時はダミーエントリを再利用し、エントリ数は1件のまま", () => {
+    it("最初の見積書選択時はダミーが除去されて新規エントリに置き換わり、エントリ数は1件のまま", () => {
       const { result } = renderHook(() =>
         useOrderDetailForm(mockQuotations)
       );

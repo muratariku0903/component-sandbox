@@ -227,8 +227,9 @@ AddOrderDetailModal
 
 - `useOrderDetailForm` の初期 `quotationEntries` は `[{ quotationId: "", details: [createEmptyDetail()] }]` の**1件のダミー**で始まる（`createInitialEntries()`）
 - `selectedQuotationIndex` は `findIndex(e => e.quotationId === "")` で **0** を返すため、未選択でも `QuotationDetailForm` が正しい useFieldArray パスで動作する
-- 最初の `selectQuotation(id)` 呼び出し時は、新規エントリ追加ではなく**ダミーエントリの `quotationId` を差し替えて claim** する（エントリ数は1件のまま）
-- 以降の選択は従来通り append
+- `selectQuotation(id)` 呼び出し時は、先にダミー（`quotationId === ""`）を除去してから、選択された見積書のエントリを append する
+  - 最初の選択: ダミー除去 → 新規エントリ append（エントリ数は1件のまま）
+  - 以降の選択: ダミーは既に存在しないので単に append
 - `resetForm()` もダミーエントリ1件で初期化
 
 ---
