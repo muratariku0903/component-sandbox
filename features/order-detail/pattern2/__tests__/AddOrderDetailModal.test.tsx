@@ -31,6 +31,16 @@ function renderModal(props: Partial<Parameters<typeof AddOrderDetailModal>[0]> =
   };
 }
 
+/** 見積書選択セレクトを特定（税率セレクトと区別するため option[value="quote-1"] を持つものを探す） */
+function getQuotationSelect(): HTMLElement {
+  const selects = screen.getAllByRole("combobox");
+  const found = selects.find(
+    (el) => el.querySelector('option[value="quote-1"]') !== null
+  );
+  if (!found) throw new Error("quotation selector not found");
+  return found;
+}
+
 describe("AddOrderDetailModal (pattern2)", () => {
   // --- 初期表示 ---
   describe("初期表示", () => {
@@ -39,17 +49,46 @@ describe("AddOrderDetailModal (pattern2)", () => {
       expect(screen.getByText("発注明細追加")).toBeInTheDocument();
     });
 
-    it("見積書未選択時は明細フィールドが表示されない", () => {
+    it("見積書未選択時は明細入力フィールドと明細追加ボタンが非活性で表示される", () => {
       renderModal();
+      // 空の明細1行とその入力群が表示される
+      expect(screen.getByText("明細 1")).toBeInTheDocument();
+      // 入力フィールドが全て非活性
+      expect(screen.getByPlaceholderText("商品名")).toBeDisabled();
+      expect(screen.getByPlaceholderText("型番号")).toBeDisabled();
+      const numberInputs = screen.getAllByPlaceholderText("0");
+      numberInputs.forEach((input) => expect(input).toBeDisabled());
+      // 「明細を追加」ボタンが非活性
       expect(
-        screen.getByText("見積書を選択すると明細フィールドが表示されます")
-      ).toBeInTheDocument();
+        screen.getByRole("button", { name: /明細を追加/ })
+      ).toBeDisabled();
     });
 
-    it("明細追加ボタンが常に活性である", () => {
+    it("見積書未選択時はフッターの明細追加ボタンが非活性", () => {
       renderModal();
       const submitBtn = screen.getByRole("button", { name: "明細追加" });
-      expect(submitBtn).not.toBeDisabled();
+      expect(submitBtn).toBeDisabled();
+    });
+
+    it("見積書未選択時は税区分ラジオボタンは活性のまま", () => {
+      renderModal();
+      expect(screen.getByLabelText("税抜")).not.toBeDisabled();
+      expect(screen.getByLabelText("税込")).not.toBeDisabled();
+    });
+
+    it("見積書を選択するとフィールドと各ボタンが活性になる", async () => {
+      const user = userEvent.setup();
+      renderModal();
+
+      await user.selectOptions(getQuotationSelect(), "quote-1");
+
+      expect(screen.getByPlaceholderText("商品名")).not.toBeDisabled();
+      expect(
+        screen.getByRole("button", { name: /明細を追加/ })
+      ).not.toBeDisabled();
+      expect(
+        screen.getByRole("button", { name: "明細追加" })
+      ).not.toBeDisabled();
     });
 
     it("税区分の初期値が税抜である", () => {
@@ -61,23 +100,24 @@ describe("AddOrderDetailModal (pattern2)", () => {
 
   // --- 見積書選択 ---
   describe("見積書選択", () => {
-    it("見積書を選択すると明細入力フィールドが表示される", async () => {
+    it("見積書を選択すると明細入力フィールドが活性で表示される", async () => {
       const user = userEvent.setup();
       renderModal();
 
-      const select = screen.getByRole("combobox");
-      await user.selectOptions(select, "quote-1");
+      await user.selectOptions(getQuotationSelect(), "quote-1");
 
       expect(screen.getByText("明細入力")).toBeInTheDocument();
       expect(screen.getByText("明細 1")).toBeInTheDocument();
-      expect(screen.getByPlaceholderText("商品名")).toBeInTheDocument();
+      const productNameInput = screen.getByPlaceholderText("商品名");
+      expect(productNameInput).toBeInTheDocument();
+      expect(productNameInput).not.toBeDisabled();
     });
 
     it("見積書を選択すると空の明細1行だけ表示される", async () => {
       const user = userEvent.setup();
       renderModal();
 
-      await user.selectOptions(screen.getByRole("combobox"), "quote-1");
+      await user.selectOptions(getQuotationSelect(), "quote-1");
 
       const detailHeaders = screen.getAllByText(/^明細 \d+$/);
       expect(detailHeaders).toHaveLength(1);
@@ -90,7 +130,7 @@ describe("AddOrderDetailModal (pattern2)", () => {
       const user = userEvent.setup();
       renderModal();
 
-      await user.selectOptions(screen.getByRole("combobox"), "quote-1");
+      await user.selectOptions(getQuotationSelect(), "quote-1");
       expect(screen.getAllByText(/^明細 \d+$/)).toHaveLength(1);
 
       await user.click(screen.getByRole("button", { name: /明細を追加/ }));
@@ -101,7 +141,7 @@ describe("AddOrderDetailModal (pattern2)", () => {
       const user = userEvent.setup();
       renderModal();
 
-      await user.selectOptions(screen.getByRole("combobox"), "quote-1");
+      await user.selectOptions(getQuotationSelect(), "quote-1");
       expect(screen.queryByLabelText("明細を削除")).not.toBeInTheDocument();
 
       await user.click(screen.getByRole("button", { name: /明細を追加/ }));
@@ -115,7 +155,7 @@ describe("AddOrderDetailModal (pattern2)", () => {
       const user = userEvent.setup();
       renderModal();
 
-      await user.selectOptions(screen.getByRole("combobox"), "quote-1");
+      await user.selectOptions(getQuotationSelect(), "quote-1");
 
       const findTaxRateSelect = () => {
         const selects = screen.getAllByRole("combobox");
@@ -140,7 +180,7 @@ describe("AddOrderDetailModal (pattern2)", () => {
       const { onSave } = renderModal();
 
       // 見積書を選択して商品名だけ入力（amountが空）
-      await user.selectOptions(screen.getByRole("combobox"), "quote-1");
+      await user.selectOptions(getQuotationSelect(), "quote-1");
       await user.type(screen.getByPlaceholderText("商品名"), "テスト商品");
 
       const submitBtn = screen.getByRole("button", { name: "明細追加" });
@@ -155,7 +195,7 @@ describe("AddOrderDetailModal (pattern2)", () => {
       const user = userEvent.setup();
       const { onSave } = renderModal();
 
-      await user.selectOptions(screen.getByRole("combobox"), "quote-1");
+      await user.selectOptions(getQuotationSelect(), "quote-1");
 
       // 金額のみ入力（商品名が空）
       const numberInputs = screen.getAllByPlaceholderText("0");
@@ -172,7 +212,7 @@ describe("AddOrderDetailModal (pattern2)", () => {
       const user = userEvent.setup();
       const { onSave, onClose } = renderModal();
 
-      await user.selectOptions(screen.getByRole("combobox"), "quote-1");
+      await user.selectOptions(getQuotationSelect(), "quote-1");
 
       await user.type(screen.getByPlaceholderText("商品名"), "テスト商品");
       await user.type(screen.getByPlaceholderText("型番号"), "ABC-123");
@@ -193,7 +233,7 @@ describe("AddOrderDetailModal (pattern2)", () => {
       const user = userEvent.setup();
       const { onSave } = renderModal();
 
-      await user.selectOptions(screen.getByRole("combobox"), "quote-1");
+      await user.selectOptions(getQuotationSelect(), "quote-1");
 
       // 1行目を正しく入力
       const productNameInputs = screen.getAllByPlaceholderText("商品名");
@@ -220,7 +260,7 @@ describe("AddOrderDetailModal (pattern2)", () => {
       const user = userEvent.setup();
       renderModal();
 
-      const select = screen.getByRole("combobox");
+      const select = getQuotationSelect();
       await user.selectOptions(select, "quote-1");
 
       // 商品名だけ入力（amountが空 → 不正）
@@ -239,7 +279,7 @@ describe("AddOrderDetailModal (pattern2)", () => {
       const user = userEvent.setup();
       renderModal();
 
-      const select = screen.getByRole("combobox");
+      const select = getQuotationSelect();
       await user.selectOptions(select, "quote-1");
 
       // 全必須フィールドを入力
@@ -263,7 +303,7 @@ describe("AddOrderDetailModal (pattern2)", () => {
       const user = userEvent.setup();
       const { onSave, onClose } = renderModal();
 
-      await user.selectOptions(screen.getByRole("combobox"), "quote-1");
+      await user.selectOptions(getQuotationSelect(), "quote-1");
 
       await user.type(screen.getByPlaceholderText("商品名"), "テスト商品");
       await user.type(screen.getByPlaceholderText("型番号"), "ABC-123");
