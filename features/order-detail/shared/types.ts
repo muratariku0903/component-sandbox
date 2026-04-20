@@ -50,6 +50,13 @@ export const detailItemSchema = z.object({
     }),
 });
 
+/**
+ * 見積書1件分の明細配列のスキーマ。
+ * Zod が配列を iterate し、issue.path = [detailIndex, fieldName] で失敗箇所を返す。
+ * クロス行/クロスフィールドの検証が必要になれば superRefine をここに追加する。
+ */
+export const quotationDetailsSchema = z.array(detailItemSchema);
+
 /** モーダルフォームの Zod スキーマ */
 export const modalFormSchema = z
   .object({
