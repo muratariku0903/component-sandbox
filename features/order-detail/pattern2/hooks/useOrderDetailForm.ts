@@ -4,6 +4,11 @@ import type { DetailItem, Quotation, SavedQuotationDetail } from "../../shared/t
 import { detailItemSchema } from "../../shared/types";
 import type { Pattern2ModalFormData, QuotationFormEntry } from "../types";
 
+type DetailFieldName = keyof DetailItem;
+
+const isDetailFieldName = (name: unknown): name is DetailFieldName =>
+  typeof name === "string" && name in detailItemSchema.shape;
+
 const createEmptyDetail = (): DetailItem => ({
   productName: "",
   modelNumber: "",
@@ -47,10 +52,9 @@ export function useOrderDetailForm(quotations: Quotation[]) {
     const result = detailItemSchema.safeParse(detail);
     if (!result.success) {
       for (const issue of result.error.issues) {
-        const fieldName = issue.path[0] as string;
-        form.setError(`${basePath}.${fieldName}` as any, {
-          message: issue.message,
-        });
+        const fieldName = issue.path[0];
+        if (!isDetailFieldName(fieldName)) continue;
+        form.setError(`${basePath}.${fieldName}`, { message: issue.message });
         hasError = true;
       }
     }

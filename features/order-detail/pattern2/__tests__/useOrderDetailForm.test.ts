@@ -22,17 +22,18 @@ function getCurrentDetailCount(result: { current: ReturnType<typeof useOrderDeta
 }
 
 /** 選択中の見積書の明細にsetValueするヘルパー */
-function setDetailValue(
+function setDetailValue<K extends keyof DetailItem>(
   result: { current: ReturnType<typeof useOrderDetailForm> },
   detailIndex: number,
-  field: keyof DetailItem,
-  value: string | number
+  field: K,
+  value: DetailItem[K]
 ) {
   const idx = result.current.selectedQuotationIndex;
-  result.current.form.setValue(
-    `quotationEntries.${idx}.details.${detailIndex}.${field}` as `quotationEntries.${number}.details.${number}.${keyof DetailItem}`,
-    value as never
+  const entries = result.current.form.getValues("quotationEntries");
+  const newDetails = entries[idx].details.map((d, i) =>
+    i === detailIndex ? { ...d, [field]: value } : d
   );
+  result.current.form.setValue(`quotationEntries.${idx}.details`, newDetails);
 }
 
 describe("useOrderDetailForm (pattern2)", () => {

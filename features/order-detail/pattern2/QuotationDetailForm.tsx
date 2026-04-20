@@ -85,7 +85,7 @@ export function QuotationDetailForm({
                 flex="1"
                 minW="140px"
                 invalid={!!fieldErrors?.productName}
-                errorText={fieldErrors?.productName?.message as string}
+                errorText={fieldErrors?.productName?.message}
               >
                 <Input
                   {...register(`${basePath}.${index}.productName`)}
@@ -127,7 +127,7 @@ export function QuotationDetailForm({
                 flex="1"
                 minW="80px"
                 invalid={!!fieldErrors?.taxRate}
-                errorText={fieldErrors?.taxRate?.message as string}
+                errorText={fieldErrors?.taxRate?.message}
               >
                 <NativeSelectRoot>
                   <NativeSelectField
@@ -148,7 +148,7 @@ export function QuotationDetailForm({
                 flex="1"
                 minW="100px"
                 invalid={!!fieldErrors?.amount}
-                errorText={fieldErrors?.amount?.message as string}
+                errorText={fieldErrors?.amount?.message}
               >
                 <Input
                   type="number"

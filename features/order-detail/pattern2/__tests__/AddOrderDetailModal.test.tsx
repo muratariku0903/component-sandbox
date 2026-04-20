@@ -12,21 +12,22 @@ const mockQuotations: Quotation[] = [
 ];
 
 function renderModal(props: Partial<Parameters<typeof AddOrderDetailModal>[0]> = {}) {
-  const defaultProps = {
-    open: true,
-    onClose: vi.fn(),
-    quotations: mockQuotations,
-    onSave: vi.fn(),
-    ...props,
-  };
+  const onClose = vi.fn();
+  const onSave = vi.fn();
   return {
     ...render(
       <Provider>
-        <AddOrderDetailModal {...defaultProps} />
+        <AddOrderDetailModal
+          open
+          quotations={mockQuotations}
+          onClose={onClose}
+          onSave={onSave}
+          {...props}
+        />
       </Provider>
     ),
-    onClose: defaultProps.onClose as ReturnType<typeof vi.fn>,
-    onSave: defaultProps.onSave as ReturnType<typeof vi.fn>,
+    onClose,
+    onSave,
   };
 }
 
