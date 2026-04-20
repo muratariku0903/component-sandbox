@@ -39,13 +39,18 @@ function setDetailValue<K extends keyof DetailItem>(
 describe("useOrderDetailForm (pattern2)", () => {
   // --- 初期状態 ---
   describe("初期状態", () => {
-    it("見積書が未選択の状態で初期化される", () => {
+    it("見積書が未選択の状態で初期化され、表示用ダミーエントリが1件だけ存在する", () => {
       const { result } = renderHook(() =>
         useOrderDetailForm(mockQuotations)
       );
       expect(result.current.selectedQuotationId).toBe("");
       expect(result.current.taxType).toBe("tax_exclusive");
-      expect(result.current.form.getValues("quotationEntries")).toHaveLength(0);
+
+      // 非活性表示用のダミーエントリ（quotationId === ""）が1件だけ存在
+      const entries = result.current.form.getValues("quotationEntries");
+      expect(entries).toHaveLength(1);
+      expect(entries[0].quotationId).toBe("");
+      expect(entries[0].details).toHaveLength(1);
     });
   });
 
@@ -62,6 +67,23 @@ describe("useOrderDetailForm (pattern2)", () => {
 
       expect(result.current.selectedQuotationId).toBe("quote-1");
       expect(getCurrentDetailCount(result)).toBe(1);
+    });
+
+    it("最初の見積書選択時はダミーエントリを再利用し、エントリ数は1件のまま", () => {
+      const { result } = renderHook(() =>
+        useOrderDetailForm(mockQuotations)
+      );
+
+      // 初期状態: ダミー1件
+      expect(result.current.form.getValues("quotationEntries")).toHaveLength(1);
+
+      act(() => {
+        result.current.selectQuotation("quote-1");
+      });
+
+      const entries = result.current.form.getValues("quotationEntries");
+      expect(entries).toHaveLength(1);
+      expect(entries[0].quotationId).toBe("quote-1");
     });
 
     it("入力済みの見積書から別の見積書に切り替えられる", () => {
@@ -573,7 +595,7 @@ describe("useOrderDetailForm (pattern2)", () => {
 
   // --- リセット ---
   describe("フォームリセット", () => {
-    it("リセットすると全状態が初期化される", () => {
+    it("リセットするとダミーエントリ1件だけの初期状態に戻る", () => {
       const { result } = renderHook(() =>
         useOrderDetailForm(mockQuotations)
       );
@@ -592,7 +614,10 @@ describe("useOrderDetailForm (pattern2)", () => {
 
       expect(result.current.selectedQuotationId).toBe("");
       expect(result.current.taxType).toBe("tax_exclusive");
-      expect(result.current.form.getValues("quotationEntries")).toHaveLength(0);
+      const entries = result.current.form.getValues("quotationEntries");
+      expect(entries).toHaveLength(1);
+      expect(entries[0].quotationId).toBe("");
+      expect(entries[0].details[0].productName).toBe("");
     });
 
     it("リセット後に見積書を選択すると空の明細が表示される", () => {
@@ -749,7 +774,7 @@ describe("useOrderDetailForm (pattern2)", () => {
       expect(details[1].productName).toBe("商品B");
     });
 
-    it("初期化後にリセットすると全データがクリアされる", () => {
+    it("初期化後にリセットするとダミーエントリ1件だけの初期状態に戻る", () => {
       const { result } = renderHook(() =>
         useOrderDetailForm(mockQuotations)
       );
@@ -764,7 +789,9 @@ describe("useOrderDetailForm (pattern2)", () => {
 
       expect(result.current.selectedQuotationId).toBe("");
       expect(result.current.taxType).toBe("tax_exclusive");
-      expect(result.current.form.getValues("quotationEntries")).toHaveLength(0);
+      const entries = result.current.form.getValues("quotationEntries");
+      expect(entries).toHaveLength(1);
+      expect(entries[0].quotationId).toBe("");
     });
 
     it("未保存の見積書を選択すると空の明細1行が表示される", () => {

@@ -215,12 +215,21 @@ AddOrderDetailModal
 - 明細の追加/削除ボタンもこのコンポーネント内に配置
 - `key={quotationId}` によるリマウントで、見積書切替時にデータが自動ロードされる
 - `form.formState.errors` からフィールド単位のエラーを取得し、`<Field invalid errorText>` で表示
+- `disabled` prop で全入力・追加/削除ボタンを非活性化可能（見積書未選択時の表示に使用）
 
 ### DetailInputForm（pattern2 版）
 
 - 薄いラッパー
-- 見積書未選択時: プレースホルダーテキスト表示
-- 選択時: `<QuotationDetailForm key={quotationId} />` に委譲
+- 見積書未選択時: `QuotationDetailForm` に `disabled` を渡して非活性の1行を表示
+- 選択時: 通常モードで `<QuotationDetailForm key={quotationId} />` に委譲
+
+### ダミーエントリの仕組み（未選択時の表示）
+
+- `useOrderDetailForm` の初期 `quotationEntries` は `[{ quotationId: "", details: [createEmptyDetail()] }]` の**1件のダミー**で始まる（`createInitialEntries()`）
+- `selectedQuotationIndex` は `findIndex(e => e.quotationId === "")` で **0** を返すため、未選択でも `QuotationDetailForm` が正しい useFieldArray パスで動作する
+- 最初の `selectQuotation(id)` 呼び出し時は、新規エントリ追加ではなく**ダミーエントリの `quotationId` を差し替えて claim** する（エントリ数は1件のまま）
+- 以降の選択は従来通り append
+- `resetForm()` もダミーエントリ1件で初期化
 
 ---
 

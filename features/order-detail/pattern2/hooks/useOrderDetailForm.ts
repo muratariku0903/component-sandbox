@@ -18,13 +18,18 @@ const createEmptyDetail = (): DetailItem => ({
   amount: "",
 });
 
+/** 未選択時の表示用に使うダミーエントリ。最初の見積書選択時に claim（quotationId を差し替え）して再利用する */
+const createInitialEntries = (): QuotationFormEntry[] => [
+  { quotationId: "", details: [createEmptyDetail()] },
+];
+
 export function useOrderDetailForm(quotations: Quotation[]) {
   const [selectedQuotationId, setSelectedQuotationId] = useState<string>("");
 
   const form = useForm<Pattern2ModalFormData>({
     defaultValues: {
       taxType: "tax_exclusive",
-      quotationEntries: [],
+      quotationEntries: createInitialEntries(),
     },
   });
 
@@ -128,10 +133,19 @@ export function useOrderDetailForm(quotations: Quotation[]) {
       const exists = entries.some((e) => e.quotationId === quotationId);
 
       if (!exists) {
-        form.setValue("quotationEntries", [
-          ...entries,
-          { quotationId, details: [createEmptyDetail()] },
-        ]);
+        // 未選択時の表示用ダミー（quotationId === ""）が残っていれば claim して再利用
+        const dummyIdx = entries.findIndex((e) => e.quotationId === "");
+        if (dummyIdx !== -1) {
+          const claimed = entries.map((e, i) =>
+            i === dummyIdx ? { ...e, quotationId } : e
+          );
+          form.setValue("quotationEntries", claimed);
+        } else {
+          form.setValue("quotationEntries", [
+            ...entries,
+            { quotationId, details: [createEmptyDetail()] },
+          ]);
+        }
       }
 
       setSelectedQuotationId(quotationId);
@@ -184,7 +198,7 @@ export function useOrderDetailForm(quotations: Quotation[]) {
   const resetForm = useCallback(() => {
     form.reset({
       taxType: "tax_exclusive",
-      quotationEntries: [],
+      quotationEntries: createInitialEntries(),
     });
     setSelectedQuotationId("");
   }, [form]);
