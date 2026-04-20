@@ -146,6 +146,7 @@ export function AddOrderDetailModal({
           <Button
             colorPalette="blue"
             onClick={handleSave}
+            disabled={!selectedQuotationId}
           >
             {isEditing ? "更新" : "明細追加"}
           </Button>
