@@ -1,14 +1,20 @@
 import { useForm } from "react-hook-form";
 import { useState, useCallback, useMemo } from "react";
 import type { DetailItem, Quotation, SavedQuotationDetail } from "../../shared/types";
+import { detailItemSchema } from "../../shared/types";
 import type { Pattern2ModalFormData, QuotationFormEntry } from "../types";
+
+type DetailFieldName = keyof DetailItem;
+
+const isDetailFieldName = (name: unknown): name is DetailFieldName =>
+  typeof name === "string" && name in detailItemSchema.shape;
 
 const createEmptyDetail = (): DetailItem => ({
   productName: "",
   modelNumber: "",
   unitPrice: "",
   quantity: "",
-  taxRate: "",
+  taxRate: 10,
   amount: "",
 });
 
@@ -32,9 +38,92 @@ export function useOrderDetailForm(quotations: Quotation[]) {
     return entries.findIndex((e) => e.quotationId === selectedQuotationId);
   }, [selectedQuotationId, getValues]);
 
+  // 明細行をZodで検証し、エラーをセットする
+  const validateDetail = (
+    detail: DetailItem,
+    entryIdx: number,
+    detailIdx: number,
+  ): boolean => {
+    let hasError = false;
+    const basePath =
+      `quotationEntries.${entryIdx}.details.${detailIdx}` as const;
+
+    // detailItemSchema で検証（productName, amount）
+    const result = detailItemSchema.safeParse(detail);
+    if (!result.success) {
+      for (const issue of result.error.issues) {
+        const fieldName = issue.path[0];
+        if (!isDetailFieldName(fieldName)) continue;
+        form.setError(`${basePath}.${fieldName}`, { message: issue.message });
+        hasError = true;
+      }
+    }
+
+    return !hasError;
+  };
+
+  // 現在の見積書をバリデーション（全行を検証、空行も含む）
+  const validateCurrentQuotation = useCallback((): boolean => {
+    const entries = getValues("quotationEntries");
+    const currentIdx = entries.findIndex(
+      (e) => e.quotationId === selectedQuotationId
+    );
+    if (currentIdx === -1) return true;
+
+    // 該当パスのエラーをクリア
+    form.clearErrors(`quotationEntries.${currentIdx}.details`);
+
+    const currentEntry = entries[currentIdx];
+    let allValid = true;
+
+    for (let i = 0; i < currentEntry.details.length; i++) {
+      if (!validateDetail(currentEntry.details[i], currentIdx, i)) {
+        allValid = false;
+      }
+    }
+
+    return allValid;
+  }, [form, getValues, selectedQuotationId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // 全見積書をバリデーション（全行を検証、空行も含む）
+  const validateAllEntries = useCallback((): boolean => {
+    const entries = getValues("quotationEntries");
+
+    // 全エラーをクリア
+    form.clearErrors("quotationEntries");
+
+    let allValid = true;
+
+    for (let entryIdx = 0; entryIdx < entries.length; entryIdx++) {
+      const entry = entries[entryIdx];
+      for (let detailIdx = 0; detailIdx < entry.details.length; detailIdx++) {
+        if (!validateDetail(entry.details[detailIdx], entryIdx, detailIdx)) {
+          allValid = false;
+        }
+      }
+    }
+
+    return allValid;
+  }, [form, getValues]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // 見積書選択
   const selectQuotation = useCallback(
     (quotationId: string) => {
+      // 既に選択中の見積書がある場合、切替前にバリデーション
+      if (selectedQuotationId && selectedQuotationId !== quotationId) {
+        if (!validateCurrentQuotation()) {
+          return; // バリデーション失敗: 切替を阻止
+        }
+        // バリデーション成功: エラーをクリア
+        const entries = getValues("quotationEntries");
+        const currentIdx = entries.findIndex(
+          (e) => e.quotationId === selectedQuotationId
+        );
+        if (currentIdx !== -1) {
+          form.clearErrors(`quotationEntries.${currentIdx}.details`);
+        }
+      }
+
       const entries = getValues("quotationEntries");
       const exists = entries.some((e) => e.quotationId === quotationId);
 
@@ -47,7 +136,7 @@ export function useOrderDetailForm(quotations: Quotation[]) {
 
       setSelectedQuotationId(quotationId);
     },
-    [form, getValues]
+    [form, getValues, selectedQuotationId, validateCurrentQuotation]
   );
 
   // 明細行を追加
@@ -100,36 +189,6 @@ export function useOrderDetailForm(quotations: Quotation[]) {
     setSelectedQuotationId("");
   }, [form]);
 
-  // 数値フィールドが空かどうか
-  const isNumericEmpty = (value: number | ""): boolean => {
-    return value === "" || value === 0 || Number.isNaN(value);
-  };
-
-  // 明細が完全に空かどうか
-  const isDetailEmpty = (detail: DetailItem): boolean => {
-    return (
-      detail.productName === "" &&
-      detail.modelNumber === "" &&
-      isNumericEmpty(detail.unitPrice) &&
-      isNumericEmpty(detail.quantity) &&
-      isNumericEmpty(detail.amount)
-    );
-  };
-
-  // 明細が完全に入力済みかどうか（必須フィールドのみ）
-  const isDetailComplete = (detail: DetailItem): boolean => {
-    const base =
-      detail.productName !== "" &&
-      detail.amount !== "" &&
-      !Number.isNaN(detail.amount) &&
-      Number(detail.amount) > 0;
-
-    if (form.getValues("taxType") === "tax_inclusive") {
-      return base && (detail.taxRate === 8 || detail.taxRate === 10);
-    }
-    return base;
-  };
-
   // 全見積書のデータを集約
   const getAllQuotationData = useCallback((): Record<string, DetailItem[]> => {
     const entries = getValues("quotationEntries");
@@ -139,36 +198,6 @@ export function useOrderDetailForm(quotations: Quotation[]) {
     }
     return result;
   }, [getValues]);
-
-  // 送信可能かチェック
-  const isAllFilled = useCallback((): boolean => {
-    const entries = getValues("quotationEntries");
-    let hasAtLeastOneComplete = false;
-
-    for (const entry of entries) {
-      if (!entry.details || entry.details.length === 0) continue;
-      const isCurrent = entry.quotationId === selectedQuotationId;
-
-      // 非表示の見積書: 全明細が空なら未着手としてスキップ
-      if (!isCurrent) {
-        const allEmpty = entry.details.every((d) => isDetailEmpty(d));
-        if (allEmpty) continue;
-      }
-
-      for (const detail of entry.details) {
-        if (isDetailEmpty(detail)) {
-          return false;
-        }
-        if (isDetailComplete(detail)) {
-          hasAtLeastOneComplete = true;
-        } else {
-          return false;
-        }
-      }
-    }
-
-    return hasAtLeastOneComplete;
-  }, [selectedQuotationId, getValues, form]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return {
     form,
@@ -180,7 +209,8 @@ export function useOrderDetailForm(quotations: Quotation[]) {
     removeDetailRow,
     resetForm,
     initializeFromSaved,
-    isAllFilled,
+    validateAllEntries,
+    validateCurrentQuotation,
     getAllQuotationData,
   };
 }
