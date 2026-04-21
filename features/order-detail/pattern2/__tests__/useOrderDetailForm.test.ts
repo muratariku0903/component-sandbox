@@ -36,6 +36,29 @@ function setDetailValue<K extends keyof DetailItem>(
   result.current.form.setValue(`quotationEntries.${idx}.details`, newDetails);
 }
 
+/**
+ * 選択中の見積書に空の明細行を1件追加するテストヘルパー。
+ * プロダクションでは QuotationDetailForm 内の useFieldArray.append で追加される操作を模倣。
+ */
+function addEmptyRow(
+  result: { current: ReturnType<typeof useOrderDetailForm> }
+) {
+  const idx = result.current.selectedQuotationIndex;
+  const entries = result.current.form.getValues("quotationEntries");
+  const newDetails: DetailItem[] = [
+    ...entries[idx].details,
+    {
+      productName: "",
+      modelNumber: "",
+      unitPrice: "",
+      quantity: "",
+      taxRate: 10,
+      amount: "",
+    },
+  ];
+  result.current.form.setValue(`quotationEntries.${idx}.details`, newDetails);
+}
+
 describe("useOrderDetailForm (pattern2)", () => {
   // --- 初期状態 ---
   describe("初期状態", () => {
@@ -121,14 +144,14 @@ describe("useOrderDetailForm (pattern2)", () => {
         setDetailValue(result, 0, "amount", 1000);
       });
       act(() => {
-        result.current.addDetailRow();
+        addEmptyRow(result);
       });
       act(() => {
         setDetailValue(result, 1, "productName", "商品A2");
         setDetailValue(result, 1, "amount", 2000);
       });
       act(() => {
-        result.current.addDetailRow();
+        addEmptyRow(result);
       });
       act(() => {
         setDetailValue(result, 2, "productName", "商品A3");
@@ -203,7 +226,7 @@ describe("useOrderDetailForm (pattern2)", () => {
         setDetailValue(result, 0, "amount", 1000);
       });
       act(() => {
-        result.current.addDetailRow();
+        addEmptyRow(result);
       });
       act(() => {
         setDetailValue(result, 1, "productName", "商品A2");
@@ -226,60 +249,6 @@ describe("useOrderDetailForm (pattern2)", () => {
         result.current.selectQuotation("quote-1");
       });
       expect(getCurrentDetailCount(result)).toBe(2);
-    });
-  });
-
-  // --- 明細行の追加・削除 ---
-  describe("明細行の追加・削除", () => {
-    it("明細行を追加できる", () => {
-      const { result } = renderHook(() =>
-        useOrderDetailForm(mockQuotations)
-      );
-
-      act(() => {
-        result.current.selectQuotation("quote-1");
-      });
-      expect(getCurrentDetailCount(result)).toBe(1);
-
-      act(() => {
-        result.current.addDetailRow();
-      });
-      expect(getCurrentDetailCount(result)).toBe(2);
-    });
-
-    it("明細が2行以上あれば削除できる", () => {
-      const { result } = renderHook(() =>
-        useOrderDetailForm(mockQuotations)
-      );
-
-      act(() => {
-        result.current.selectQuotation("quote-1");
-      });
-      act(() => {
-        result.current.addDetailRow();
-      });
-      expect(getCurrentDetailCount(result)).toBe(2);
-
-      act(() => {
-        result.current.removeDetailRow(0);
-      });
-      expect(getCurrentDetailCount(result)).toBe(1);
-    });
-
-    it("明細が1行の場合は削除できない", () => {
-      const { result } = renderHook(() =>
-        useOrderDetailForm(mockQuotations)
-      );
-
-      act(() => {
-        result.current.selectQuotation("quote-1");
-      });
-      expect(getCurrentDetailCount(result)).toBe(1);
-
-      act(() => {
-        result.current.removeDetailRow(0);
-      });
-      expect(getCurrentDetailCount(result)).toBe(1);
     });
   });
 
@@ -419,7 +388,7 @@ describe("useOrderDetailForm (pattern2)", () => {
       });
       // quote-2 で空行を追加（保存はブロックされるはず）
       act(() => {
-        result.current.addDetailRow();
+        addEmptyRow(result);
       });
 
       let valid: boolean;
@@ -565,7 +534,7 @@ describe("useOrderDetailForm (pattern2)", () => {
       });
       // 空の行2を追加
       act(() => {
-        result.current.addDetailRow();
+        addEmptyRow(result);
       });
 
       act(() => {
@@ -630,7 +599,7 @@ describe("useOrderDetailForm (pattern2)", () => {
         result.current.selectQuotation("quote-1");
       });
       act(() => {
-        result.current.addDetailRow();
+        addEmptyRow(result);
         setDetailValue(result, 0, "productName", "商品A");
       });
 
