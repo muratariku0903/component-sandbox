@@ -232,14 +232,18 @@ export function AddOrderDetailModal({
       onOpenChange={(e) => !e.open && handleClose()}
       size="xl"
     >
-      <DialogContent>
+      <DialogContent maxH="90vh">
         <DialogHeader>
           <DialogTitle>{isEditing ? "発注明細編集" : "発注明細追加"}</DialogTitle>
         </DialogHeader>
         <DialogCloseTrigger />
 
         <DialogBody>
-          <Grid templateColumns={{ base: "1fr", md: "1fr 1.5fr" }} gap={6}>
+          <Grid
+            templateColumns={{ base: "1fr", md: "1fr 1.5fr" }}
+            gap={6}
+            alignItems="start"
+          >
             <GridItem>
               <QuotationSelector
                 quotations={quotations}
@@ -251,7 +255,11 @@ export function AddOrderDetailModal({
                 }
               />
             </GridItem>
-            <GridItem>
+            <GridItem
+              maxH={{ base: "50vh", md: "60vh" }}
+              overflowY="auto"
+              pr={2}
+            >
               <DetailInputForm
                 quotationId={selectedQuotationId}
                 form={form}
