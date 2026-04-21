@@ -1,5 +1,6 @@
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Button, Grid, GridItem } from "@chakra-ui/react";
+import { useForm } from "react-hook-form";
 import {
   DialogRoot,
   DialogContent,
@@ -11,8 +12,33 @@ import {
 } from "@/components/ui/dialog";
 import { QuotationSelector } from "./QuotationSelector";
 import { DetailInputForm } from "./DetailInputForm";
-import { useOrderDetailForm } from "./hooks/useOrderDetailForm";
-import type { Quotation, SavedQuotationDetail, TaxType } from "../shared/types";
+import type {
+  DetailItem,
+  Quotation,
+  SavedQuotationDetail,
+  TaxType,
+} from "../shared/types";
+import { detailItemSchema, quotationDetailsSchema } from "../shared/types";
+import type { Pattern2ModalFormData, QuotationFormEntry } from "./types";
+
+type DetailFieldName = keyof DetailItem;
+
+const isDetailFieldName = (name: unknown): name is DetailFieldName =>
+  typeof name === "string" && name in detailItemSchema.shape;
+
+const createEmptyDetail = (): DetailItem => ({
+  productName: "",
+  modelNumber: "",
+  unitPrice: "",
+  quantity: "",
+  taxRate: 10,
+  amount: "",
+});
+
+/** 未選択時の表示用に使うダミーエントリ。最初の見積書選択時に除去する */
+const createInitialEntries = (): QuotationFormEntry[] => [
+  { quotationId: "", details: [createEmptyDetail()] },
+];
 
 interface AddOrderDetailModalProps {
   open: boolean;
@@ -29,22 +55,115 @@ export function AddOrderDetailModal({
   onSave,
   savedDetails = [],
 }: AddOrderDetailModalProps) {
-  const {
-    form,
-    selectedQuotationId,
-    selectedQuotationIndex,
-    selectQuotation,
-    taxType,
-    resetForm,
-    initializeFromSaved,
-    validateCurrentQuotation,
-    getAllQuotationData,
-  } = useOrderDetailForm(quotations);
+  const [selectedQuotationId, setSelectedQuotationId] = useState<string>("");
 
-  // フォーム値の変更・エラー変更で再レンダリング
-  form.watch();
+  const form = useForm<Pattern2ModalFormData>({
+    defaultValues: {
+      taxType: "tax_exclusive",
+      quotationEntries: createInitialEntries(),
+    },
+  });
+
+  const { getValues } = form;
+  const taxType = form.watch("taxType");
   // エラー変更の購読（見積書切替ブロック時にセレクトを元の値に戻すため）
+  form.watch();
   const _errors = form.formState.errors; // eslint-disable-line @typescript-eslint/no-unused-vars
+
+  // 選択中の見積書のインデックスを取得
+  const selectedQuotationIndex = useMemo(() => {
+    const entries = getValues("quotationEntries");
+    return entries.findIndex((e) => e.quotationId === selectedQuotationId);
+  }, [selectedQuotationId, getValues]);
+
+  // 現在の見積書をバリデーション（全行を検証、空行も含む）。
+  // 検証ロジックは quotationDetailsSchema（shared/types.ts）に集約されており、
+  // ここでは Zod の結果を RHF の setError に流し込むだけ。
+  const validateCurrentQuotation = useCallback((): boolean => {
+    const entries = getValues("quotationEntries");
+    const currentIdx = entries.findIndex(
+      (e) => e.quotationId === selectedQuotationId
+    );
+    if (currentIdx === -1) return true;
+
+    form.clearErrors(`quotationEntries.${currentIdx}.details`);
+
+    const result = quotationDetailsSchema.safeParse(entries[currentIdx].details);
+    if (result.success) return true;
+
+    for (const issue of result.error.issues) {
+      // issue.path = [detailIndex, fieldName]
+      const detailIdx = issue.path[0];
+      const fieldName = issue.path[1];
+      if (typeof detailIdx !== "number" || !isDetailFieldName(fieldName)) continue;
+
+      form.setError(
+        `quotationEntries.${currentIdx}.details.${detailIdx}.${fieldName}`,
+        { message: issue.message }
+      );
+    }
+
+    return false;
+  }, [form, getValues, selectedQuotationId]);
+
+  const selectQuotation = useCallback(
+    (quotationId: string) => {
+      if (selectedQuotationId && selectedQuotationId !== quotationId) {
+        if (!validateCurrentQuotation()) {
+          return; // バリデーション失敗: 切替を阻止
+        }
+        const entries = getValues("quotationEntries");
+        const currentIdx = entries.findIndex(
+          (e) => e.quotationId === selectedQuotationId
+        );
+        if (currentIdx !== -1) {
+          form.clearErrors(`quotationEntries.${currentIdx}.details`);
+        }
+      }
+
+      const entries = getValues("quotationEntries");
+      const entriesWithoutDummy = entries.filter((e) => e.quotationId !== "");
+      const exists = entriesWithoutDummy.some(
+        (e) => e.quotationId === quotationId
+      );
+
+      if (!exists) {
+        form.setValue("quotationEntries", [
+          ...entriesWithoutDummy,
+          { quotationId, details: [createEmptyDetail()] },
+        ]);
+      } else if (entriesWithoutDummy.length !== entries.length) {
+        form.setValue("quotationEntries", entriesWithoutDummy);
+      }
+
+      setSelectedQuotationId(quotationId);
+    },
+    [form, getValues, selectedQuotationId, validateCurrentQuotation]
+  );
+
+  const initializeFromSaved = useCallback(
+    (details: SavedQuotationDetail[]) => {
+      if (details.length === 0) return;
+
+      const entries: QuotationFormEntry[] = details.map((saved) => ({
+        quotationId: saved.quotation.id,
+        details: structuredClone(saved.details),
+      }));
+
+      form.setValue("taxType", details[0].taxType);
+      form.setValue("quotationEntries", entries);
+      setSelectedQuotationId(details[0].quotation.id);
+    },
+    [form]
+  );
+
+  const resetForm = useCallback(() => {
+    form.reset({
+      taxType: "tax_exclusive",
+      quotationEntries: createInitialEntries(),
+    });
+    setSelectedQuotationId("");
+  }, [form]);
 
   // モーダルオープン時に保存済みデータがあれば初期化
   const prevOpenRef = useRef(false);
@@ -68,11 +187,13 @@ export function AddOrderDetailModal({
     // 現在の見積書のみ検証。他の見積書は「切替成功時に検証済み」の不変条件により既に valid
     if (!validateCurrentQuotation()) return;
 
-    const allData = getAllQuotationData();
+    const entries = getValues("quotationEntries");
     const currentTaxType = form.getValues("taxType");
     const results: SavedQuotationDetail[] = [];
 
-    Object.entries(allData).forEach(([quotationId, details]) => {
+    entries.forEach(({ quotationId, details }) => {
+      if (!quotationId) return;
+
       const filledDetails = details.filter(
         (d) =>
           d.productName !== "" ||

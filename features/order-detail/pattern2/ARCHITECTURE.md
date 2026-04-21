@@ -41,7 +41,7 @@ API送信 (将来実装)
 
 ---
 
-### 2. モーダルレベル RHF (`useOrderDetailForm.ts`)
+### 2. モーダルレベル RHF (`AddOrderDetailModal.tsx` 内に直接実装)
 
 ```typescript
 useForm<Pattern2ModalFormData>({
@@ -133,7 +133,7 @@ register(`quotationEntries.${quotationIndex}.details.${detailIndex}.unitPrice`, 
 ### 5. Zodバリデーションフロー
 
 **検証ルールは `shared/types.ts` の Zod スキーマに集約する。**
-フック (`useOrderDetailForm`) は検証ロジックを持たず、Zod の結果を RHF の `setError` に流し込むだけ。
+モーダル内のバリデーション処理は検証ロジックを持たず、Zod の結果を RHF の `setError` に流し込むだけ。
 
 #### スキーマ階層
 
@@ -184,30 +184,29 @@ register(`quotationEntries.${quotationIndex}.details.${detailIndex}.unitPrice`, 
 
 ---
 
-### 6. フック API（useOrderDetailForm）
+### 6. モーダル内部ロジック（AddOrderDetailModal 内に直接実装）
 
-#### パターン1 から削除されたもの
+唯一の利用箇所が `AddOrderDetailModal` だけだったため、フックには切り出さず同コンポーネント内にロジックを直接記述する。
+
+#### パターン1 から不要になったもの
 
 - `useRef` → 不要（全データが RHF 内）
 - `fieldArray` / `replace()` → 不要（各 QuotationDetailForm が自身の useFieldArray を持つ）
 - `saveCurrentToRef()` → 不要
 - `isAllFilled()` → Zod検証に置換
 
-#### 新しく追加されたもの
+#### モーダル内に保持する状態・関数
 
-| 戻り値 | 型 | 説明 |
-|--------|------|------|
-| `selectedQuotationIndex` | `number` | 現在の見積書のインデックス（-1 = 未選択） |
+| 名前 | 型 | 説明 |
+|------|------|------|
+| `selectedQuotationId` | `useState<string>` | 現在の見積書 ID（未選択時 `""`） |
+| `selectedQuotationIndex` | `useMemo<number>` | `quotationEntries` 内の該当インデックス（-1 = 未選択） |
 | `validateCurrentQuotation` | `() => boolean` | 現在の見積書の全明細行（空行含む）をZod検証。保存時・切替時の両方で使用 |
+| `selectQuotation` | `(id: string) => void` | バリデーション → エントリ追加（未訪問時のみ）+ ID 変更 |
+| `initializeFromSaved` | `(details) => void` | モーダル再オープン時に savedDetails から復元 |
+| `resetForm` | `() => void` | ダミーエントリ1件だけの初期状態に戻す |
 
-#### 変更されたもの
-
-| 関数 | パターン1 | パターン2 |
-|------|----------|----------|
-| `selectQuotation` | ref に退避 → replace で復元 | バリデーション → エントリ追加（未訪問時のみ）+ ID 変更 |
-| `getAllQuotationData` | ref から集約 | `form.getValues("quotationEntries")` から変換 |
-
-> 明細行の追加/削除はパターン2 では `QuotationDetailForm` 内の `useFieldArray.append` / `remove` で完結するため、フック側からは公開していない。
+> 明細行の追加/削除はパターン2 では `QuotationDetailForm` 内の `useFieldArray.append` / `remove` で完結するため、モーダルからは公開していない。
 
 ---
 
@@ -239,7 +238,7 @@ AddOrderDetailModal
 
 ### ダミーエントリの仕組み（未選択時の表示）
 
-- `useOrderDetailForm` の初期 `quotationEntries` は `[{ quotationId: "", details: [createEmptyDetail()] }]` の**1件のダミー**で始まる（`createInitialEntries()`）
+- `AddOrderDetailModal` の初期 `quotationEntries` は `[{ quotationId: "", details: [createEmptyDetail()] }]` の**1件のダミー**で始まる（`createInitialEntries()`）
 - `selectedQuotationIndex` は `findIndex(e => e.quotationId === "")` で **0** を返すため、未選択でも `QuotationDetailForm` が正しい useFieldArray パスで動作する
 - `selectQuotation(id)` 呼び出し時は、先にダミー（`quotationId === ""`）を除去してから、選択された見積書のエントリを append する
   - 最初の選択: ダミー除去 → 新規エントリ append（エントリ数は1件のまま）
