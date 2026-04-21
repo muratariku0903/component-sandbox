@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { render, screen, within } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Provider } from "@/components/ui/provider";
 import { AddOrderDetailModal } from "../AddOrderDetailModal";
@@ -39,6 +39,27 @@ function getQuotationSelect(): HTMLElement {
   );
   if (!found) throw new Error("quotation selector not found");
   return found;
+}
+
+/** 現在表示中の全ての「商品名」入力フィールドを取得 */
+function getProductNameInputs(): HTMLInputElement[] {
+  return screen.getAllByPlaceholderText("商品名") as HTMLInputElement[];
+}
+
+/** 現在表示中の「0」プレースホルダ数値入力を取得（順序は単価/数量/税率後の金額の並び） */
+function getNumberInputs(): HTMLInputElement[] {
+  return screen.getAllByPlaceholderText("0") as HTMLInputElement[];
+}
+
+/** N 行目 (0-origin) の amount フィールドを取得。1行あたり数値入力は 3 つ（unitPrice, quantity, amount）。 */
+function getAmountInputAt(row: number): HTMLInputElement {
+  const inputs = getNumberInputs();
+  return inputs[row * 3 + 2];
+}
+
+/** N 行目 (0-origin) の商品名フィールドを取得 */
+function getProductNameInputAt(row: number): HTMLInputElement {
+  return getProductNameInputs()[row];
 }
 
 describe("AddOrderDetailModal (pattern2)", () => {
@@ -122,6 +143,26 @@ describe("AddOrderDetailModal (pattern2)", () => {
       const detailHeaders = screen.getAllByText(/^明細 \d+$/);
       expect(detailHeaders).toHaveLength(1);
     });
+
+    it("見積書を切り替えても前の見積書のフィールド数・入力内容は影響しない", async () => {
+      const user = userEvent.setup();
+      renderModal();
+
+      const select = getQuotationSelect();
+      // 見積書1 に2行入力
+      await user.selectOptions(select, "quote-1");
+      await user.type(getProductNameInputAt(0), "商品A1");
+      await user.type(getAmountInputAt(0), "1000");
+      await user.click(screen.getByRole("button", { name: /明細を追加/ }));
+      await user.type(getProductNameInputAt(1), "商品A2");
+      await user.type(getAmountInputAt(1), "2000");
+      expect(screen.getAllByText(/^明細 \d+$/)).toHaveLength(2);
+
+      // 見積書2 へ切替 → 空の1行だけ
+      await user.selectOptions(select, "quote-2");
+      expect(screen.getAllByText(/^明細 \d+$/)).toHaveLength(1);
+      expect(getProductNameInputAt(0)).toHaveValue("");
+    });
   });
 
   // --- 明細行の追加 ---
@@ -198,8 +239,7 @@ describe("AddOrderDetailModal (pattern2)", () => {
       await user.selectOptions(getQuotationSelect(), "quote-1");
 
       // 金額のみ入力（商品名が空）
-      const numberInputs = screen.getAllByPlaceholderText("0");
-      await user.type(numberInputs[2], "1000"); // amount
+      await user.type(getAmountInputAt(0), "1000");
 
       const submitBtn = screen.getByRole("button", { name: "明細追加" });
       await user.click(submitBtn);
@@ -229,6 +269,20 @@ describe("AddOrderDetailModal (pattern2)", () => {
       expect(onClose).toHaveBeenCalledTimes(1);
     });
 
+    it("税込で必須フィールドが入力済みなら保存できる（税率はデフォルト10%で常に有効）", async () => {
+      const user = userEvent.setup();
+      const { onSave } = renderModal();
+
+      await user.selectOptions(getQuotationSelect(), "quote-1");
+      await user.click(screen.getByLabelText("税込"));
+      await user.type(screen.getByPlaceholderText("商品名"), "テスト商品");
+      await user.type(getAmountInputAt(0), "1000");
+
+      await user.click(screen.getByRole("button", { name: "明細追加" }));
+
+      expect(onSave).toHaveBeenCalledTimes(1);
+    });
+
     it("空の明細行が残っているとバリデーションエラーで保存できない", async () => {
       const user = userEvent.setup();
       const { onSave } = renderModal();
@@ -236,10 +290,8 @@ describe("AddOrderDetailModal (pattern2)", () => {
       await user.selectOptions(getQuotationSelect(), "quote-1");
 
       // 1行目を正しく入力
-      const productNameInputs = screen.getAllByPlaceholderText("商品名");
-      await user.type(productNameInputs[0], "テスト商品");
-      const numberInputs = screen.getAllByPlaceholderText("0");
-      await user.type(numberInputs[2], "1000"); // 1行目のamount
+      await user.type(getProductNameInputAt(0), "テスト商品");
+      await user.type(getAmountInputAt(0), "1000");
 
       // 明細行を追加（2行目は空のまま）
       await user.click(screen.getByRole("button", { name: /明細を追加/ }));
@@ -251,6 +303,26 @@ describe("AddOrderDetailModal (pattern2)", () => {
       expect(onSave).not.toHaveBeenCalled();
       expect(screen.getByText("商品名は必須です")).toBeInTheDocument();
       expect(screen.getByText("金額は必須です")).toBeInTheDocument();
+    });
+
+    it("エラー表示後に必須を埋めて再度保存するとエラーがクリアされて保存される", async () => {
+      const user = userEvent.setup();
+      const { onSave } = renderModal();
+
+      await user.selectOptions(getQuotationSelect(), "quote-1");
+      await user.type(getAmountInputAt(0), "1000");
+
+      // 1回目: 商品名未入力のまま保存 → エラー
+      await user.click(screen.getByRole("button", { name: "明細追加" }));
+      expect(screen.getByText("商品名は必須です")).toBeInTheDocument();
+      expect(onSave).not.toHaveBeenCalled();
+
+      // 商品名を入力して再度保存 → 成功
+      await user.type(getProductNameInputAt(0), "商品A");
+      await user.click(screen.getByRole("button", { name: "明細追加" }));
+
+      expect(onSave).toHaveBeenCalledTimes(1);
+      expect(screen.queryByText("商品名は必須です")).not.toBeInTheDocument();
     });
   });
 
@@ -271,8 +343,44 @@ describe("AddOrderDetailModal (pattern2)", () => {
 
       // バリデーションエラーが表示される
       expect(screen.getByText("金額は必須です")).toBeInTheDocument();
-      // 見積書1のままとどまる（明細1が表示されたまま）
-      expect(screen.getByText("明細 1")).toBeInTheDocument();
+      // 見積書1のままとどまる（入力済みのテキストが保持されている）
+      expect(getProductNameInputAt(0)).toHaveValue("テスト商品");
+    });
+
+    it("空の見積書（直後に選択して何も入力していない）からは別見積書に切替できず、最初の行に必須エラーがセットされる", async () => {
+      const user = userEvent.setup();
+      renderModal();
+
+      const select = getQuotationSelect();
+      await user.selectOptions(select, "quote-1");
+      await user.selectOptions(select, "quote-2");
+
+      expect(screen.getByText("商品名は必須です")).toBeInTheDocument();
+      expect(screen.getByText("金額は必須です")).toBeInTheDocument();
+    });
+
+    it("行1入力済み + 空の行2 追加の状態では切替が阻止され、行2にエラーが表示される", async () => {
+      const user = userEvent.setup();
+      renderModal();
+
+      const select = getQuotationSelect();
+      await user.selectOptions(select, "quote-1");
+
+      // 行1 を全入力
+      await user.type(getProductNameInputAt(0), "商品A");
+      await user.type(getAmountInputAt(0), "1000");
+
+      // 空の行2 を追加
+      await user.click(screen.getByRole("button", { name: /明細を追加/ }));
+
+      // 切替試行
+      await user.selectOptions(select, "quote-2");
+
+      // 行2 にエラー（行1 のエラーは出ない）
+      expect(screen.getByText("商品名は必須です")).toBeInTheDocument();
+      expect(screen.getByText("金額は必須です")).toBeInTheDocument();
+      // 行1 の入力が保持されている（＝ 切替は阻止された）
+      expect(getProductNameInputAt(0)).toHaveValue("商品A");
     });
 
     it("正しく入力された見積書から別の見積書に切替えできる", async () => {
@@ -284,8 +392,7 @@ describe("AddOrderDetailModal (pattern2)", () => {
 
       // 全必須フィールドを入力
       await user.type(screen.getByPlaceholderText("商品名"), "テスト商品");
-      const numberInputs = screen.getAllByPlaceholderText("0");
-      await user.type(numberInputs[2], "1000"); // amount
+      await user.type(getAmountInputAt(0), "1000");
 
       // 見積書2に切替
       await user.selectOptions(select, "quote-2");
@@ -294,6 +401,30 @@ describe("AddOrderDetailModal (pattern2)", () => {
       expect(screen.getByText("明細 1")).toBeInTheDocument();
       const productNameInput = screen.getByPlaceholderText("商品名");
       expect(productNameInput).toHaveValue("");
+    });
+
+    it("見積書を切り替えて戻ると入力値が保持される", async () => {
+      const user = userEvent.setup();
+      renderModal();
+
+      const select = getQuotationSelect();
+      // 見積書1 入力
+      await user.selectOptions(select, "quote-1");
+      await user.type(getProductNameInputAt(0), "商品A");
+      await user.type(screen.getByPlaceholderText("型番号"), "ABC-123");
+      await user.type(getAmountInputAt(0), "1000");
+
+      // 見積書2 に切替（切替成功のため必須入力）
+      await user.selectOptions(select, "quote-2");
+      await user.type(getProductNameInputAt(0), "商品B");
+      await user.type(getAmountInputAt(0), "2000");
+
+      // 見積書1 に戻す
+      await user.selectOptions(select, "quote-1");
+
+      expect(getProductNameInputAt(0)).toHaveValue("商品A");
+      expect(screen.getByPlaceholderText("型番号")).toHaveValue("ABC-123");
+      expect(getAmountInputAt(0)).toHaveValue(1000);
     });
   });
 
@@ -326,6 +457,32 @@ describe("AddOrderDetailModal (pattern2)", () => {
       expect(savedData[0].subtotal).toBe(1000);
     });
 
+    it("複数の見積書に入力した場合、全見積書分が保存される", async () => {
+      const user = userEvent.setup();
+      const { onSave } = renderModal();
+
+      const select = getQuotationSelect();
+      await user.selectOptions(select, "quote-1");
+      await user.type(getProductNameInputAt(0), "商品A");
+      await user.type(getAmountInputAt(0), "1000");
+
+      await user.selectOptions(select, "quote-2");
+      await user.type(getProductNameInputAt(0), "商品B");
+      await user.type(getAmountInputAt(0), "2000");
+
+      await user.click(screen.getByRole("button", { name: "明細追加" }));
+
+      expect(onSave).toHaveBeenCalledTimes(1);
+      const savedData = onSave.mock.calls[0][0] as SavedQuotationDetail[];
+      expect(savedData).toHaveLength(2);
+
+      const byId = Object.fromEntries(savedData.map((d) => [d.quotation.id, d]));
+      expect(byId["quote-1"].details[0].productName).toBe("商品A");
+      expect(byId["quote-1"].subtotal).toBe(1000);
+      expect(byId["quote-2"].details[0].productName).toBe("商品B");
+      expect(byId["quote-2"].subtotal).toBe(2000);
+    });
+
     it("キャンセルボタンでonCloseが呼ばれる", async () => {
       const user = userEvent.setup();
       const { onClose } = renderModal();
@@ -342,9 +499,18 @@ describe("AddOrderDetailModal (pattern2)", () => {
         quotation: { id: "quote-1", name: "見積書1" },
         taxType: "tax_exclusive",
         details: [
-          { productName: "商品A", modelNumber: "M-001", unitPrice: 100, quantity: 10, taxRate: "", amount: 1000 },
+          { productName: "商品A", modelNumber: "M-001", unitPrice: 100, quantity: 10, taxRate: 10, amount: 1000 },
+          { productName: "商品B", modelNumber: "M-002", unitPrice: 200, quantity: 5, taxRate: 8, amount: 1000 },
         ],
-        subtotal: 1000,
+        subtotal: 2000,
+      },
+      {
+        quotation: { id: "quote-2", name: "見積書2" },
+        taxType: "tax_exclusive",
+        details: [
+          { productName: "商品C", modelNumber: "M-003", unitPrice: 500, quantity: 3, taxRate: 10, amount: 1500 },
+        ],
+        subtotal: 1500,
       },
     ];
 
@@ -372,7 +538,41 @@ describe("AddOrderDetailModal (pattern2)", () => {
       renderModal({ savedDetails: mockSavedDetails });
 
       expect(screen.getByText("明細入力")).toBeInTheDocument();
-      expect(screen.getByText("明細 1")).toBeInTheDocument();
+      // 最初の見積書は2行保存済み
+      expect(screen.getAllByText(/^明細 \d+$/)).toHaveLength(2);
+      expect(getProductNameInputAt(0)).toHaveValue("商品A");
+      expect(getProductNameInputAt(1)).toHaveValue("商品B");
+    });
+
+    it("savedDetailsの税区分が復元される", () => {
+      const inclusiveSaved: SavedQuotationDetail[] = [
+        {
+          ...mockSavedDetails[0],
+          taxType: "tax_inclusive",
+        },
+      ];
+      renderModal({ savedDetails: inclusiveSaved });
+      expect(screen.getByLabelText("税込")).toBeChecked();
+    });
+
+    it("復元後に別の見積書に切り替えると、その見積書の保存データが表示される", async () => {
+      const user = userEvent.setup();
+      renderModal({ savedDetails: mockSavedDetails });
+
+      await user.selectOptions(getQuotationSelect(), "quote-2");
+
+      expect(screen.getAllByText(/^明細 \d+$/)).toHaveLength(1);
+      expect(getProductNameInputAt(0)).toHaveValue("商品C");
+    });
+
+    it("復元後に未保存の見積書を選択すると空の明細1行が表示される", async () => {
+      const user = userEvent.setup();
+      renderModal({ savedDetails: mockSavedDetails });
+
+      await user.selectOptions(getQuotationSelect(), "quote-3");
+
+      expect(screen.getAllByText(/^明細 \d+$/)).toHaveLength(1);
+      expect(getProductNameInputAt(0)).toHaveValue("");
     });
   });
 });
