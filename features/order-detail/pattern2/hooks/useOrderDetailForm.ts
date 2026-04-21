@@ -113,30 +113,6 @@ export function useOrderDetailForm(quotations: Quotation[]) {
     [form, getValues, selectedQuotationId, validateCurrentQuotation]
   );
 
-  // 明細行を追加
-  const addDetailRow = useCallback(() => {
-    const entries = getValues("quotationEntries");
-    const idx = entries.findIndex((e) => e.quotationId === selectedQuotationId);
-    if (idx === -1) return;
-    const details = [...entries[idx].details, createEmptyDetail()];
-    form.setValue(`quotationEntries.${idx}.details`, details);
-  }, [form, getValues, selectedQuotationId]);
-
-  // 明細行を削除
-  const removeDetailRow = useCallback(
-    (detailIndex: number) => {
-      const entries = getValues("quotationEntries");
-      const idx = entries.findIndex(
-        (e) => e.quotationId === selectedQuotationId
-      );
-      if (idx === -1) return;
-      if (entries[idx].details.length <= 1) return;
-      const details = entries[idx].details.filter((_, i) => i !== detailIndex);
-      form.setValue(`quotationEntries.${idx}.details`, details);
-    },
-    [form, getValues, selectedQuotationId]
-  );
-
   // 保存済みデータから初期化（モーダル再オープン時）
   const initializeFromSaved = useCallback(
     (savedDetails: SavedQuotationDetail[]) => {
@@ -179,8 +155,6 @@ export function useOrderDetailForm(quotations: Quotation[]) {
     selectedQuotationIndex,
     selectQuotation,
     taxType,
-    addDetailRow,
-    removeDetailRow,
     resetForm,
     initializeFromSaved,
     validateCurrentQuotation,

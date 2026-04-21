@@ -205,9 +205,9 @@ register(`quotationEntries.${quotationIndex}.details.${detailIndex}.unitPrice`, 
 | 関数 | パターン1 | パターン2 |
 |------|----------|----------|
 | `selectQuotation` | ref に退避 → replace で復元 | バリデーション → エントリ追加（未訪問時のみ）+ ID 変更 |
-| `addDetailRow` | `fieldArray.append()` | `form.setValue()` で配列操作 |
-| `removeDetailRow` | `fieldArray.remove()` | `form.setValue()` で配列操作 |
 | `getAllQuotationData` | ref から集約 | `form.getValues("quotationEntries")` から変換 |
+
+> 明細行の追加/削除はパターン2 では `QuotationDetailForm` 内の `useFieldArray.append` / `remove` で完結するため、フック側からは公開していない。
 
 ---
 
@@ -272,10 +272,10 @@ AddOrderDetailModal
 - RHF のデフォルト設定 (`shouldUnregister: false`) により、`QuotationDetailForm` がアンマウントされても `quotationEntries[idx].details` のデータは保持される
 - この仕組みにより、見積書切替時にデータの退避/復元が不要
 
-### addDetailRow / removeDetailRow は form.setValue を使用
-- `QuotationDetailForm` 内の `useFieldArray` の `append` / `remove` はコンポーネント内でのみ使用
-- フックから公開する `addDetailRow` / `removeDetailRow` は `form.setValue` で直接配列操作
-- テスト時に `renderHook` で `QuotationDetailForm` をレンダリングせずに済む
+### 明細行の追加/削除は QuotationDetailForm 側で完結
+- `QuotationDetailForm` 内の `useFieldArray` の `append` / `remove` で行追加・削除を行う
+- フックからは公開しない（プロダクションコードで二重に持つ必要がない）
+- テストで行追加が必要な場合は、テスト側に `form.setValue` ベースのヘルパーを用意する
 
 ### selectedQuotationIndex の算出
 - `useMemo` で `quotationEntries` 内の該当インデックスを算出
