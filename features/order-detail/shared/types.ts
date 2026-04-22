@@ -1,40 +1,18 @@
 import { z } from "zod";
 
 /** 税区分 */
-export type TaxType = "tax_exclusive" | "tax_inclusive";
+export const taxTypeSchema = z.enum(["tax_exclusive", "tax_inclusive"]);
+export type TaxType = z.infer<typeof taxTypeSchema>;
 
 /** 税率 */
 export type TaxRate = 0 | 8 | 10;
 
 /** 見積書 */
-export interface Quotation {
-  id: string;
-  name: string;
-}
-
-/** 明細行 */
-export interface DetailItem {
-  productName: string;
-  modelNumber: string;
-  unitPrice: number | "";
-  quantity: number | "";
-  taxRate: TaxRate | "";
-  amount: number | "";
-}
-
-/** モーダルフォーム（現在表示中の明細のみ管理） */
-export interface ModalFormData {
-  taxType: TaxType;
-  currentDetails: DetailItem[];
-}
-
-/** 保存済み明細データ */
-export interface SavedQuotationDetail {
-  quotation: Quotation;
-  taxType: TaxType;
-  details: DetailItem[];
-  subtotal: number;
-}
+export const quotationSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+});
+export type Quotation = z.infer<typeof quotationSchema>;
 
 /** 明細行の Zod スキーマ */
 export const detailItemSchema = z.object({
@@ -49,6 +27,7 @@ export const detailItemSchema = z.object({
       message: "金額は必須です",
     }),
 });
+export type DetailItem = z.infer<typeof detailItemSchema>;
 
 /**
  * 見積書1件分の明細配列のスキーマ。
@@ -57,10 +36,19 @@ export const detailItemSchema = z.object({
  */
 export const quotationDetailsSchema = z.array(detailItemSchema);
 
-/** モーダルフォームの Zod スキーマ */
+/** 保存済み明細データ */
+export const savedQuotationDetailSchema = z.object({
+  quotation: quotationSchema,
+  taxType: taxTypeSchema,
+  details: z.array(detailItemSchema),
+  subtotal: z.number(),
+});
+export type SavedQuotationDetail = z.infer<typeof savedQuotationDetailSchema>;
+
+/** モーダルフォーム（現在表示中の明細のみ管理） */
 export const modalFormSchema = z
   .object({
-    taxType: z.enum(["tax_exclusive", "tax_inclusive"]),
+    taxType: taxTypeSchema,
     currentDetails: z.array(detailItemSchema),
   })
   .superRefine((data, ctx) => {
@@ -76,9 +64,37 @@ export const modalFormSchema = z
       });
     }
   });
+export type ModalFormData = z.infer<typeof modalFormSchema>;
 
-/** ページレベルのフォームデータ（認可依頼ペイロード） */
-export interface PageFormData {
-  orderName: string;
-  savedDetails: SavedQuotationDetail[];
-}
+/** ページレベルのフォームデータ（認可依頼ペイロード）のベーススキーマ */
+export const pageFormSchema = z.object({
+  orderName: z.string().min(1, "発注名を入力してください"),
+  savedDetails: z.array(savedQuotationDetailSchema),
+});
+export type PageFormData = z.infer<typeof pageFormSchema>;
+
+/**
+ * 価格交渉金額との一致チェックを含む、外部コンテキスト付きの検証スキーマ。
+ * `handleSubmit` 時に zodResolver(createPageFormSchema(negotiationPrice)) として差し込む。
+ *
+ * root に設定されたエラーは RHF の `formState.errors.root` で取得できる。
+ */
+export const createPageFormSchema = (negotiationPrice: number) =>
+  pageFormSchema.superRefine((data, ctx) => {
+    if (data.savedDetails.length === 0) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "発注明細を追加してください",
+        path: ["root"],
+      });
+      return;
+    }
+    const orderAmount = data.savedDetails.reduce((sum, d) => sum + d.subtotal, 0);
+    if (orderAmount !== negotiationPrice) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `価格交渉金額と発注金額が一致しません（価格交渉金額: ¥${negotiationPrice.toLocaleString()} / 発注金額: ¥${orderAmount.toLocaleString()}）`,
+        path: ["root"],
+      });
+    }
+  });
