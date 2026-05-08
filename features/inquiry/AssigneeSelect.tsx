@@ -1,4 +1,3 @@
-import { useEffect, useState } from "react";
 import Select from "react-select";
 import type { Assignee } from "./types";
 
@@ -26,13 +25,6 @@ export function AssigneeSelect({
   autoFocus,
   instanceId,
 }: AssigneeSelectProps) {
-  // Popover の中で react-select のメニューが見切れないよう、メニューだけ document.body に portal する。
-  // SSR で document が無い場合のフォールバックとして mount 後にセット。
-  const [menuPortalTarget, setMenuPortalTarget] = useState<HTMLElement | null>(null);
-  useEffect(() => {
-    setMenuPortalTarget(document.body);
-  }, []);
-
   const options: AssigneeOption[] = assignees.map((a) => ({
     value: a.id,
     label: a.name,
@@ -59,10 +51,10 @@ export function AssigneeSelect({
       autoFocus={autoFocus}
       placeholder="担当者を検索..."
       noOptionsMessage={() => "該当する担当者がいません"}
-      menuPortalTarget={menuPortalTarget}
-      styles={{
-        menuPortal: (base) => ({ ...base, zIndex: 9999 }),
-      }}
+      // メニューを portal せず popover 内に直接描画する。
+      // → option クリック時に Chakra Popover の closeOnBlur が誤発火しない（focus が popover 外へ出ないため）
+      // → popover 外クリックでの自動クローズはそのまま機能する
+      menuPosition="absolute"
     />
   );
 }

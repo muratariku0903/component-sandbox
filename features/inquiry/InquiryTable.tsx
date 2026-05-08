@@ -1,6 +1,23 @@
-import { Box, IconButton, Popover, Portal, Table, Text } from "@chakra-ui/react";
+import {
+  Box,
+  IconButton,
+  Popover,
+  PopoverArrow,
+  PopoverBody,
+  PopoverCloseButton,
+  PopoverContent,
+  PopoverTrigger,
+  Portal,
+  Table,
+  TableContainer,
+  Tbody,
+  Td,
+  Text,
+  Th,
+  Thead,
+  Tr,
+} from "@chakra-ui/react";
 import { LuPencil } from "react-icons/lu";
-import { CloseButton } from "@/components/ui/close-button";
 import { AssigneeSelect } from "./AssigneeSelect";
 import { STATUS_LABELS, type Assignee, type Inquiry } from "./types";
 
@@ -17,29 +34,31 @@ export function InquiryTable({
   onAssigneeChange,
 }: InquiryTableProps) {
   return (
-    <Table.Root size="md" variant="outline">
-      <Table.Header>
-        <Table.Row>
-          <Table.ColumnHeader>タイトル</Table.ColumnHeader>
-          <Table.ColumnHeader w="120px">ステータス</Table.ColumnHeader>
-          <Table.ColumnHeader w="180px">担当者</Table.ColumnHeader>
-          <Table.ColumnHeader w="180px">作成日時</Table.ColumnHeader>
-          <Table.ColumnHeader w="60px" />
-        </Table.Row>
-      </Table.Header>
-      <Table.Body>
-        {inquiries.map((inquiry) => (
-          <InquiryRow
-            key={inquiry.id}
-            inquiry={inquiry}
-            assignees={assignees}
-            onAssigneeChange={(assignee) =>
-              onAssigneeChange(inquiry.id, assignee)
-            }
-          />
-        ))}
-      </Table.Body>
-    </Table.Root>
+    <TableContainer>
+      <Table size="md" variant="simple">
+        <Thead>
+          <Tr>
+            <Th>タイトル</Th>
+            <Th w="120px">ステータス</Th>
+            <Th w="180px">担当者</Th>
+            <Th w="180px">作成日時</Th>
+            <Th w="60px" />
+          </Tr>
+        </Thead>
+        <Tbody>
+          {inquiries.map((inquiry) => (
+            <InquiryRow
+              key={inquiry.id}
+              inquiry={inquiry}
+              assignees={assignees}
+              onAssigneeChange={(assignee) =>
+                onAssigneeChange(inquiry.id, assignee)
+              }
+            />
+          ))}
+        </Tbody>
+      </Table>
+    </TableContainer>
   );
 }
 
@@ -51,7 +70,7 @@ interface InquiryRowProps {
 
 function InquiryRow({ inquiry, assignees, onAssigneeChange }: InquiryRowProps) {
   return (
-    <Table.Row
+    <Tr
       onClick={(e) =>
         console.log("[row click]", {
           inquiryId: inquiry.id,
@@ -60,66 +79,59 @@ function InquiryRow({ inquiry, assignees, onAssigneeChange }: InquiryRowProps) {
         })
       }
     >
-      <Table.Cell>{inquiry.title}</Table.Cell>
-      <Table.Cell>{STATUS_LABELS[inquiry.status]}</Table.Cell>
-      <Table.Cell>
+      <Td>{inquiry.title}</Td>
+      <Td>{STATUS_LABELS[inquiry.status]}</Td>
+      <Td>
         {inquiry.assignee ? (
           inquiry.assignee.name
         ) : (
-          <Text color="fg.muted">未割当</Text>
+          <Text color="gray.500">未割当</Text>
         )}
-      </Table.Cell>
-      <Table.Cell>{formatDate(inquiry.createdAt)}</Table.Cell>
+      </Td>
+      <Td>{formatDate(inquiry.createdAt)}</Td>
       {/*
-        ポップオーバーを含むセル全体で stopPropagation。
-        React 合成イベントは Portal を貫通して React tree をたどるので、
-        Popover.Content / react-select のメニューからも行 onClick へバブルしてしまう。
-        セル単位で止めれば、アイコン・popover ボディ・select オプション全てを
-        一箇所でカバーできる。
+        セル自体には stopPropagation を仕掛けない。
+        セル全体で止めるとアイコン横の余白クリックも行クリック対象外になってしまう。
+        代わりに「編集アイコンそのもの」と「ポップオーバー内部」の2箇所だけで止める。
       */}
-      <Table.Cell onClick={(e) => e.stopPropagation()}>
-        <Popover.Root positioning={{ placement: "bottom-end" }}>
-          <Popover.Trigger asChild>
+      <Td>
+        <Popover placement="bottom-end">
+          <PopoverTrigger>
             <IconButton
               aria-label="担当者を編集"
               size="sm"
               variant="ghost"
-            >
-              <LuPencil />
-            </IconButton>
-          </Popover.Trigger>
+              icon={<LuPencil />}
+              onClick={(e) => e.stopPropagation()}
+            />
+          </PopoverTrigger>
           <Portal>
-            <Popover.Positioner>
-              <Popover.Content>
-                <Popover.Arrow />
-                <Popover.CloseTrigger
-                  position="absolute"
-                  top="1"
-                  insetEnd="1"
-                  asChild
-                >
-                  <CloseButton size="xs" aria-label="閉じる" />
-                </Popover.CloseTrigger>
-                <Popover.Body>
-                  <Box minW="240px" pr={6}>
-                    <Text fontSize="sm" fontWeight="bold" mb={2}>
-                      担当者
-                    </Text>
-                    <AssigneeSelect
-                      assignees={assignees}
-                      value={inquiry.assignee}
-                      onChange={onAssigneeChange}
-                      autoFocus
-                      instanceId={`assignee-${inquiry.id}`}
-                    />
-                  </Box>
-                </Popover.Body>
-              </Popover.Content>
-            </Popover.Positioner>
+            {/*
+              ポップオーバー内部（×ボタン・本文・react-select オプション）からの
+              合成イベントが Portal を貫通して行へバブルするのを Content で一括ブロック
+            */}
+            <PopoverContent onClick={(e) => e.stopPropagation()}>
+              <PopoverArrow />
+              <PopoverCloseButton />
+              <PopoverBody>
+                <Box minW="240px" pr={6}>
+                  <Text fontSize="sm" fontWeight="bold" mb={2}>
+                    担当者
+                  </Text>
+                  <AssigneeSelect
+                    assignees={assignees}
+                    value={inquiry.assignee}
+                    onChange={onAssigneeChange}
+                    autoFocus
+                    instanceId={`assignee-${inquiry.id}`}
+                  />
+                </Box>
+              </PopoverBody>
+            </PopoverContent>
           </Portal>
-        </Popover.Root>
-      </Table.Cell>
-    </Table.Row>
+        </Popover>
+      </Td>
+    </Tr>
   );
 }
 
