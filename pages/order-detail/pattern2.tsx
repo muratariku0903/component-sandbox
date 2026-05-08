@@ -17,10 +17,10 @@ const mockQuotations: Quotation[] = [
 // DB保存済みを想定したモックデータ
 const mockSavedData: PageFormData = {
   orderName: "テスト発注 2025-001",
+  taxType: "tax_exclusive",
   savedDetails: [
     {
       quotation: { id: "quote-1", name: "見積書1" },
-      taxType: "tax_exclusive",
       details: [
         { productName: "ノートPC", modelNumber: "NPC-001", unitPrice: 150000, quantity: 5, taxRate: "", amount: 750000 },
         { productName: "モニター", modelNumber: "MON-002", unitPrice: 45000, quantity: 5, taxRate: "", amount: 225000 },
@@ -29,7 +29,6 @@ const mockSavedData: PageFormData = {
     },
     {
       quotation: { id: "quote-2", name: "見積書2" },
-      taxType: "tax_exclusive",
       details: [
         { productName: "キーボード", modelNumber: "KB-100", unitPrice: 8000, quantity: 10, taxRate: "", amount: 80000 },
       ],

@@ -40,12 +40,24 @@ const createInitialEntries = (): QuotationFormEntry[] => [
   { quotationId: "", details: [createEmptyDetail()] },
 ];
 
+/** モーダル保存時の payload。taxType と明細の両方をまとめてページ側へ commit する */
+export interface ModalSavePayload {
+  taxType: TaxType;
+  details: SavedQuotationDetail[];
+}
+
 interface AddOrderDetailModalProps {
   open: boolean;
   onClose: () => void;
   quotations: Quotation[];
-  onSave: (details: SavedQuotationDetail[]) => void;
+  onSave: (payload: ModalSavePayload) => void;
   savedDetails?: SavedQuotationDetail[];
+  /**
+   * ページ側 taxType の現在値。モーダルを開いたときにこの値で初期化される。
+   * モーダル操作中は内部 form で独立管理され、保存時に onSave 経由で commit、
+   * キャンセル時は破棄される。
+   */
+  initialTaxType: TaxType;
 }
 
 export function AddOrderDetailModal({
@@ -54,21 +66,22 @@ export function AddOrderDetailModal({
   quotations,
   onSave,
   savedDetails = [],
+  initialTaxType,
 }: AddOrderDetailModalProps) {
   const [selectedQuotationId, setSelectedQuotationId] = useState<string>("");
 
   const form = useForm<Pattern2ModalFormData>({
     defaultValues: {
-      taxType: "tax_exclusive",
+      taxType: initialTaxType,
       quotationEntries: createInitialEntries(),
     },
   });
 
   const { getValues } = form;
-  const taxType = form.watch("taxType");
-  // エラー変更の購読（見積書切替ブロック時にセレクトを元の値に戻すため）
+  // エラー変更・値変更の購読（見積書切替ブロック時の再レンダリング / radio の controlled 表示更新）
   form.watch();
   const _errors = form.formState.errors; // eslint-disable-line @typescript-eslint/no-unused-vars
+  const taxType = form.watch("taxType");
 
   // 選択中の見積書のインデックスを取得
   const selectedQuotationIndex = useMemo(() => {
@@ -150,7 +163,6 @@ export function AddOrderDetailModal({
         details: structuredClone(saved.details),
       }));
 
-      form.setValue("taxType", details[0].taxType);
       form.setValue("quotationEntries", entries);
       setSelectedQuotationId(details[0].quotation.id);
     },
@@ -159,22 +171,23 @@ export function AddOrderDetailModal({
 
   const resetForm = useCallback(() => {
     form.reset({
-      taxType: "tax_exclusive",
+      taxType: initialTaxType,
       quotationEntries: createInitialEntries(),
     });
     setSelectedQuotationId("");
-  }, [form]);
+  }, [form, initialTaxType]);
 
-  // モーダルオープン時に保存済みデータがあれば初期化
+  // モーダルオープン時に、ページ側の現在値（initialTaxType + savedDetails）で内部 form を初期化
   const prevOpenRef = useRef(false);
   useEffect(() => {
     if (open && !prevOpenRef.current) {
+      form.setValue("taxType", initialTaxType);
       if (savedDetails.length > 0) {
         initializeFromSaved(savedDetails);
       }
     }
     prevOpenRef.current = open;
-  }, [open, savedDetails, initializeFromSaved]);
+  }, [open, savedDetails, initialTaxType, initializeFromSaved, form]);
 
   const isEditing = savedDetails.length > 0;
 
@@ -188,7 +201,6 @@ export function AddOrderDetailModal({
     if (!validateCurrentQuotation()) return;
 
     const entries = getValues("quotationEntries");
-    const currentTaxType = form.getValues("taxType");
     const results: SavedQuotationDetail[] = [];
 
     entries.forEach(({ quotationId, details }) => {
@@ -213,14 +225,14 @@ export function AddOrderDetailModal({
 
       results.push({
         quotation,
-        taxType: currentTaxType,
         details: filledDetails,
         subtotal,
       });
     });
 
     if (results.length > 0) {
-      onSave(results);
+      // taxType と明細をまとめてページ form に commit
+      onSave({ taxType: getValues("taxType"), details: results });
       resetForm();
       onClose();
     }

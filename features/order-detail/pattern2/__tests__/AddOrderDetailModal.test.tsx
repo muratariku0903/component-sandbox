@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { Provider } from "@/components/ui/provider";
 import { AddOrderDetailModal } from "../AddOrderDetailModal";
 import type { Quotation, SavedQuotationDetail } from "../../shared/types";
+import type { ModalSavePayload } from "../AddOrderDetailModal";
 
 const mockQuotations: Quotation[] = [
   { id: "quote-1", name: "見積書1" },
@@ -22,6 +23,7 @@ function renderModal(props: Partial<Parameters<typeof AddOrderDetailModal>[0]> =
           quotations={mockQuotations}
           onClose={onClose}
           onSave={onSave}
+          initialTaxType="tax_exclusive"
           {...props}
         />
       </Provider>
@@ -450,11 +452,12 @@ describe("AddOrderDetailModal (pattern2)", () => {
       expect(onSave).toHaveBeenCalledTimes(1);
       expect(onClose).toHaveBeenCalledTimes(1);
 
-      const savedData = onSave.mock.calls[0][0];
-      expect(savedData).toHaveLength(1);
-      expect(savedData[0].quotation.id).toBe("quote-1");
-      expect(savedData[0].details[0].productName).toBe("テスト商品");
-      expect(savedData[0].subtotal).toBe(1000);
+      const payload = onSave.mock.calls[0][0] as ModalSavePayload;
+      expect(payload.taxType).toBe("tax_exclusive");
+      expect(payload.details).toHaveLength(1);
+      expect(payload.details[0].quotation.id).toBe("quote-1");
+      expect(payload.details[0].details[0].productName).toBe("テスト商品");
+      expect(payload.details[0].subtotal).toBe(1000);
     });
 
     it("複数の見積書に入力した場合、全見積書分が保存される", async () => {
@@ -473,14 +476,31 @@ describe("AddOrderDetailModal (pattern2)", () => {
       await user.click(screen.getByRole("button", { name: "明細追加" }));
 
       expect(onSave).toHaveBeenCalledTimes(1);
-      const savedData = onSave.mock.calls[0][0] as SavedQuotationDetail[];
-      expect(savedData).toHaveLength(2);
+      const payload = onSave.mock.calls[0][0] as ModalSavePayload;
+      expect(payload.details).toHaveLength(2);
 
-      const byId = Object.fromEntries(savedData.map((d) => [d.quotation.id, d]));
+      const byId = Object.fromEntries(
+        payload.details.map((d) => [d.quotation.id, d])
+      );
       expect(byId["quote-1"].details[0].productName).toBe("商品A");
       expect(byId["quote-1"].subtotal).toBe(1000);
       expect(byId["quote-2"].details[0].productName).toBe("商品B");
       expect(byId["quote-2"].subtotal).toBe(2000);
+    });
+
+    it("モーダル内で税区分を切り替えると onSave ペイロードに反映される", async () => {
+      const user = userEvent.setup();
+      const { onSave } = renderModal();
+
+      await user.selectOptions(getQuotationSelect(), "quote-1");
+      await user.click(screen.getByLabelText("税込"));
+      await user.type(getProductNameInputAt(0), "商品A");
+      await user.type(getAmountInputAt(0), "1000");
+
+      await user.click(screen.getByRole("button", { name: "明細追加" }));
+
+      const payload = onSave.mock.calls[0][0] as ModalSavePayload;
+      expect(payload.taxType).toBe("tax_inclusive");
     });
 
     it("キャンセルボタンでonCloseが呼ばれる", async () => {
@@ -497,7 +517,6 @@ describe("AddOrderDetailModal (pattern2)", () => {
     const mockSavedDetails: SavedQuotationDetail[] = [
       {
         quotation: { id: "quote-1", name: "見積書1" },
-        taxType: "tax_exclusive",
         details: [
           { productName: "商品A", modelNumber: "M-001", unitPrice: 100, quantity: 10, taxRate: 10, amount: 1000 },
           { productName: "商品B", modelNumber: "M-002", unitPrice: 200, quantity: 5, taxRate: 8, amount: 1000 },
@@ -506,7 +525,6 @@ describe("AddOrderDetailModal (pattern2)", () => {
       },
       {
         quotation: { id: "quote-2", name: "見積書2" },
-        taxType: "tax_exclusive",
         details: [
           { productName: "商品C", modelNumber: "M-003", unitPrice: 500, quantity: 3, taxRate: 10, amount: 1500 },
         ],
@@ -544,14 +562,9 @@ describe("AddOrderDetailModal (pattern2)", () => {
       expect(getProductNameInputAt(1)).toHaveValue("商品B");
     });
 
-    it("savedDetailsの税区分が復元される", () => {
-      const inclusiveSaved: SavedQuotationDetail[] = [
-        {
-          ...mockSavedDetails[0],
-          taxType: "tax_inclusive",
-        },
-      ];
-      renderModal({ savedDetails: inclusiveSaved });
+    it("initialTaxType で初期表示のラジオが決まる", () => {
+      // モーダルは自身の form で taxType を管理するが、初期値はページから受ける
+      renderModal({ initialTaxType: "tax_inclusive" });
       expect(screen.getByLabelText("税込")).toBeChecked();
     });
 

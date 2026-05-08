@@ -13,11 +13,6 @@ export default function OrderDetailIndex() {
           発注明細 実装パターン
         </Text>
         <VStack gap={4} align="stretch">
-          <Link href="/order-detail/pattern1">
-            <Button variant="outline" width="100%" justifyContent="flex-start">
-              パターン1: useRef + useFieldArray（固定パス）
-            </Button>
-          </Link>
           <Link href="/order-detail/pattern2">
             <Button variant="outline" width="100%" justifyContent="flex-start">
               パターン2: ネスト useFieldArray（RHF 内データ管理）

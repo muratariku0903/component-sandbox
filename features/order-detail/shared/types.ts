@@ -36,39 +36,18 @@ export type DetailItem = z.infer<typeof detailItemSchema>;
  */
 export const quotationDetailsSchema = z.array(detailItemSchema);
 
-/** 保存済み明細データ */
+/** 保存済み明細データ（taxType はページ全体で1つなので PageForm 側に持つ） */
 export const savedQuotationDetailSchema = z.object({
   quotation: quotationSchema,
-  taxType: taxTypeSchema,
   details: z.array(detailItemSchema),
   subtotal: z.number(),
 });
 export type SavedQuotationDetail = z.infer<typeof savedQuotationDetailSchema>;
 
-/** モーダルフォーム（現在表示中の明細のみ管理） */
-export const modalFormSchema = z
-  .object({
-    taxType: taxTypeSchema,
-    currentDetails: z.array(detailItemSchema),
-  })
-  .superRefine((data, ctx) => {
-    if (data.taxType === "tax_inclusive") {
-      data.currentDetails.forEach((detail, index) => {
-        if (detail.taxRate !== 8 && detail.taxRate !== 10) {
-          ctx.addIssue({
-            code: z.ZodIssueCode.custom,
-            message: "税率を選択してください",
-            path: ["currentDetails", index, "taxRate"],
-          });
-        }
-      });
-    }
-  });
-export type ModalFormData = z.infer<typeof modalFormSchema>;
-
-/** ページレベルのフォームデータ（認可依頼ペイロード）のベーススキーマ */
+/** ページレベルのフォームデータ（mutation payload）のベーススキーマ */
 export const pageFormSchema = z.object({
   orderName: z.string().min(1, "発注名を入力してください"),
+  taxType: taxTypeSchema,
   savedDetails: z.array(savedQuotationDetailSchema),
 });
 export type PageFormData = z.infer<typeof pageFormSchema>;

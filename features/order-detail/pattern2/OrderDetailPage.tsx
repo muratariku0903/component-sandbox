@@ -11,11 +11,10 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { Field } from "@/components/ui/field";
 import { OrderDetailSummary } from "./OrderDetailSummary";
 import { QuotationTable } from "./QuotationTable";
-import { AddOrderDetailModal } from "./AddOrderDetailModal";
+import { AddOrderDetailModal, type ModalSavePayload } from "./AddOrderDetailModal";
 import {
   createPageFormSchema,
   type Quotation,
-  type SavedQuotationDetail,
   type PageFormData,
 } from "../shared/types";
 import { LuPlus, LuPencil } from "react-icons/lu";
@@ -52,11 +51,13 @@ export const OrderDetailPage = forwardRef<OrderDetailPageHandle, OrderDetailPage
       resolver: zodResolver(schema),
       defaultValues: initialData ?? {
         orderName: "",
+        taxType: "tax_exclusive",
         savedDetails: [],
       },
     });
 
     const savedDetails = pageForm.watch("savedDetails");
+    const taxType = pageForm.watch("taxType");
     const hasDetails = savedDetails.length > 0;
 
     // 送信可能状態（明細1件以上）の変化を親へ通知。
@@ -72,7 +73,7 @@ export const OrderDetailPage = forwardRef<OrderDetailPageHandle, OrderDetailPage
         return (
           sum +
           d.details.reduce((detailSum, item) => {
-            if (d.taxType === "tax_inclusive" && item.taxRate) {
+            if (taxType === "tax_inclusive" && item.taxRate) {
               const amt = Number(item.amount) || 0;
               const rate = Number(item.taxRate) / 100;
               return detailSum + amt - amt / (1 + rate);
@@ -82,9 +83,10 @@ export const OrderDetailPage = forwardRef<OrderDetailPageHandle, OrderDetailPage
         );
       }, 0);
       return { orderAmount: order, taxAmount: Math.round(tax) };
-    }, [savedDetails]);
+    }, [savedDetails, taxType]);
 
-    const handleModalSave = (details: SavedQuotationDetail[]) => {
+    const handleModalSave = ({ taxType: nextTaxType, details }: ModalSavePayload) => {
+      pageForm.setValue("taxType", nextTaxType);
       pageForm.setValue("savedDetails", details);
       // 明細が更新されたので前回の Zod エラー（価格不一致／明細なし）をクリア
       pageForm.clearErrors();
@@ -156,6 +158,7 @@ export const OrderDetailPage = forwardRef<OrderDetailPageHandle, OrderDetailPage
           quotations={quotations}
           onSave={handleModalSave}
           savedDetails={savedDetails}
+          initialTaxType={taxType}
         />
       </Box>
     );
