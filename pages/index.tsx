@@ -13,9 +13,9 @@ export default function Home() {
           パーツ一覧
         </Text>
         <VStack gap={4} align="stretch">
-          <Link href="/order-detail">
+          <Link href="/inquiry">
             <Button variant="outline" width="100%" justifyContent="flex-start">
-              発注明細
+              問い合わせ一覧
             </Button>
           </Link>
         </VStack>
