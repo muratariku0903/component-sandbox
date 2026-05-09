@@ -95,7 +95,14 @@ function InquiryRow({ inquiry, assignees, onAssigneeChange }: InquiryRowProps) {
         代わりに「編集アイコンそのもの」と「ポップオーバー内部」の2箇所だけで止める。
       */}
       <Td>
-        <Popover placement="bottom-end">
+        {/*
+          bottom-start: popover の左端が trigger の左端に揃う
+          → popover が右に伸びる + 矢印が popover 左端（trigger の真下）に出る
+          offset=[skidding, distance]:
+            - skidding (1番目) = 横方向ずらし。正値で右、負値で左
+            - distance (2番目) = trigger との縦の隙間。Chakra v2 のデフォルトは 8
+        */}
+        <Popover placement="bottom-start" offset={[16, 8]}>
           <PopoverTrigger>
             <IconButton
               aria-label="担当者を編集"
