@@ -45,12 +45,7 @@ export const detailItemSchema = z
     modelNumber: z
       .string()
       .max(75, "商品型番号は75文字以内で入力してください"),
-    unitPrice: optionalNumberSchema.refine(
-      (val) => !isEnteredNumber(val) || val !== 0,
-      {
-        message: "単価は0以外を入力してください",
-      }
-    ),
+    unitPrice: optionalNumberSchema,
     quantity: optionalNumberSchema.refine(
       (val) => !isEnteredNumber(val) || val !== 0,
       {
@@ -62,9 +57,6 @@ export const detailItemSchema = z
       .refine((val) => isEnteredNumber(val), {
         message: "金額は必須です",
       })
-      .refine((val) => !isEnteredNumber(val) || val !== 0, {
-        message: "金額は0以外を入力してください",
-      })
       .refine((val) => !isEnteredNumber(val) || Number.isInteger(val), {
         message: "金額は整数で入力してください",
       }),
@@ -74,9 +66,7 @@ export const detailItemSchema = z
       !isEnteredNumber(detail.unitPrice) ||
       !isEnteredNumber(detail.quantity) ||
       !isEnteredNumber(detail.amount) ||
-      detail.unitPrice === 0 ||
       detail.quantity === 0 ||
-      detail.amount === 0 ||
       !Number.isInteger(detail.amount)
     ) {
       return;

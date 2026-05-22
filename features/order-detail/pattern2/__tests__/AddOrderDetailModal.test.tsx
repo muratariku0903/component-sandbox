@@ -299,22 +299,21 @@ describe("AddOrderDetailModal", () => {
       expect(onSave).not.toHaveBeenCalled();
     });
 
-    it("単価が0の場合はバリデーションエラーが表示される", async () => {
+    it("単価は0でも保存できる", async () => {
       const user = userEvent.setup();
       const { onSave } = renderModal();
 
       await user.selectOptions(getQuotationSelect(), "quote-1");
       await user.type(getProductNameInputAt(0), "商品A");
       await user.type(getNumberInputs()[0], "0");
-      await user.type(getAmountInputAt(0), "1000");
+      await user.type(getAmountInputAt(0), "0");
 
       await user.click(screen.getByRole("button", { name: "明細追加" }));
 
-      expect(screen.getByText("単価は0以外を入力してください")).toBeInTheDocument();
-      expect(onSave).not.toHaveBeenCalled();
+      expect(onSave).toHaveBeenCalledTimes(1);
     });
 
-    it("金額が0の場合はバリデーションエラーが表示される", async () => {
+    it("金額は0でも保存できる", async () => {
       const user = userEvent.setup();
       const { onSave } = renderModal();
 
@@ -324,8 +323,7 @@ describe("AddOrderDetailModal", () => {
 
       await user.click(screen.getByRole("button", { name: "明細追加" }));
 
-      expect(screen.getByText("金額は0以外を入力してください")).toBeInTheDocument();
-      expect(onSave).not.toHaveBeenCalled();
+      expect(onSave).toHaveBeenCalledTimes(1);
     });
 
     it("数量が0の場合はバリデーションエラーが表示される", async () => {
