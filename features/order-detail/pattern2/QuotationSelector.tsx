@@ -22,20 +22,28 @@ export function QuotationSelector({
   taxType,
   onTaxTypeChange,
 }: QuotationSelectorProps) {
+  const hasQuotations = quotations.length > 0;
+
   return (
     <Box display="flex" flexDirection="column" gap={4}>
       <Field label="見積書を選択">
-        <NativeSelectRoot>
-          <NativeSelectField
-            placeholder="選択してください"
-            value={selectedQuotationId}
-            onChange={(e) => void onSelectQuotation(e.target.value)}
-            items={quotations.map((q) => ({
-              value: q.id,
-              label: q.name,
-            }))}
-          />
-        </NativeSelectRoot>
+        {hasQuotations ? (
+          <NativeSelectRoot>
+            <NativeSelectField
+              placeholder="選択してください"
+              value={selectedQuotationId}
+              onChange={(e) => void onSelectQuotation(e.target.value)}
+              items={quotations.map((q) => ({
+                value: q.id,
+                label: q.name,
+              }))}
+            />
+          </NativeSelectRoot>
+        ) : (
+          <Text color="fg.muted" fontSize="sm">
+            連携された見積書はありません
+          </Text>
+        )}
       </Field>
 
       <Field label="税区分">
@@ -65,9 +73,11 @@ export function QuotationSelector({
           justifyContent="center"
         >
           <Text color="fg.muted" fontSize="sm">
-            {selectedQuotationId
-              ? "選択された見積書のプレビュー"
-              : "見積書を選択してください"}
+            {!hasQuotations
+              ? "見積書なしで明細を手入力します"
+              : selectedQuotationId
+                ? "選択された見積書のプレビュー"
+                : "見積書を選択してください"}
           </Text>
         </Box>
       </Box>

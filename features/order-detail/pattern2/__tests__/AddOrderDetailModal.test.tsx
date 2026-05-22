@@ -97,6 +97,20 @@ describe("AddOrderDetailModal", () => {
       expect(screen.getByLabelText("税込")).not.toBeDisabled();
     });
 
+    it("見積書が0件の場合は初期表示から明細入力と保存ができる", () => {
+      renderModal({ quotations: [] });
+
+      expect(screen.getByText("連携された見積書はありません")).toBeInTheDocument();
+      expect(screen.getByPlaceholderText("商品名")).not.toBeDisabled();
+      expect(screen.getByPlaceholderText("型番号")).not.toBeDisabled();
+      expect(
+        screen.getByRole("button", { name: /明細を追加/ })
+      ).not.toBeDisabled();
+      expect(
+        screen.getByRole("button", { name: "明細追加" })
+      ).not.toBeDisabled();
+    });
+
     it("見積書を選択するとフィールドと各ボタンが活性になる", async () => {
       const user = userEvent.setup();
       renderModal();
@@ -324,6 +338,17 @@ describe("AddOrderDetailModal", () => {
       expect(onSave).toHaveBeenCalledTimes(1);
       expect(screen.queryByText("商品名は必須です")).not.toBeInTheDocument();
     });
+
+    it("見積書が0件の場合も同じバリデーションで空行は保存できない", async () => {
+      const user = userEvent.setup();
+      const { onSave } = renderModal({ quotations: [] });
+
+      await user.click(screen.getByRole("button", { name: "明細追加" }));
+
+      expect(onSave).not.toHaveBeenCalled();
+      expect(screen.getByText("商品名は必須です")).toBeInTheDocument();
+      expect(screen.getByText("金額は必須です")).toBeInTheDocument();
+    });
   });
 
   // --- 見積書切替時のバリデーション ---
@@ -481,6 +506,28 @@ describe("AddOrderDetailModal", () => {
       expect(byId["quote-1"].subtotal).toBe(1000);
       expect(byId["quote-2"].details[0].productName).toBe("商品B");
       expect(byId["quote-2"].subtotal).toBe(2000);
+    });
+
+    it("見積書が0件の場合は見積書なしの明細として保存される", async () => {
+      const user = userEvent.setup();
+      const { onSave, onClose } = renderModal({ quotations: [] });
+
+      await user.type(getProductNameInputAt(0), "手入力商品");
+      await user.type(getAmountInputAt(0), "3000");
+
+      await user.click(screen.getByRole("button", { name: "明細追加" }));
+
+      expect(onSave).toHaveBeenCalledTimes(1);
+      expect(onClose).toHaveBeenCalledTimes(1);
+
+      const savedData = onSave.mock.calls[0][0] as SavedQuotationDetail[];
+      expect(savedData).toHaveLength(1);
+      expect(savedData[0].quotation).toEqual({
+        id: "manual-entry",
+        name: "見積書なし",
+      });
+      expect(savedData[0].details[0].productName).toBe("手入力商品");
+      expect(savedData[0].subtotal).toBe(3000);
     });
 
     it("キャンセルボタンでonCloseが呼ばれる", async () => {

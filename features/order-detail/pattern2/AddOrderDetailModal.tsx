@@ -36,6 +36,11 @@ const createInitialEntries = (): QuotationFormEntry[] => [
   { quotationId: "", details: [createEmptyDetail()] },
 ];
 
+const manualQuotation: Quotation = {
+  id: "manual-entry",
+  name: "見積書なし",
+};
+
 interface AddOrderDetailModalProps {
   open: boolean;
   onClose: () => void;
@@ -52,6 +57,7 @@ export function AddOrderDetailModal({
   savedDetails = [],
 }: AddOrderDetailModalProps) {
   const [selectedQuotationId, setSelectedQuotationId] = useState<string>("");
+  const canEditWithoutQuotation = quotations.length === 0;
 
   const form = useForm<OrderDetailModalFormData>({
     resolver: zodResolver(orderDetailModalFormSchema),
@@ -165,7 +171,7 @@ export function AddOrderDetailModal({
     const results: SavedQuotationDetail[] = [];
 
     entries.forEach(({ quotationId, details }) => {
-      if (!quotationId) return;
+      if (!quotationId && !canEditWithoutQuotation) return;
 
       const filledDetails = details.filter(
         (d) =>
@@ -176,7 +182,9 @@ export function AddOrderDetailModal({
       );
       if (filledDetails.length === 0) return;
 
-      const quotation = quotations.find((q) => q.id === quotationId);
+      const quotation = quotationId
+        ? quotations.find((q) => q.id === quotationId)
+        : manualQuotation;
       if (!quotation) return;
 
       const subtotal = filledDetails.reduce(
@@ -229,6 +237,7 @@ export function AddOrderDetailModal({
                 quotationId={selectedQuotationId}
                 form={form}
                 quotationIndex={selectedQuotationIndex}
+                canEditWithoutQuotation={canEditWithoutQuotation}
               />
             </GridItem>
           </Grid>
@@ -241,7 +250,7 @@ export function AddOrderDetailModal({
           <Button
             colorPalette="blue"
             onClick={handleSave}
-            disabled={!selectedQuotationId}
+            disabled={!selectedQuotationId && !canEditWithoutQuotation}
           >
             {isEditing ? "更新" : "明細追加"}
           </Button>

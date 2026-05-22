@@ -218,6 +218,8 @@ AddOrderDetailModal
 
 - `AddOrderDetailModal` の初期 `quotationEntries` は `[{ quotationId: "", details: [createEmptyDetail()] }]` の**1件のダミー**で始まる（`createInitialEntries()`）
 - `selectedQuotationIndex` は `findIndex(e => e.quotationId === "")` で **0** を返すため、未選択でも `QuotationDetailForm` が正しい useFieldArray パスで動作する
+- 見積書が1件も連携されていない場合は、この初期エントリをダミーではなく手入力用エントリとして扱い、入力・行追加・保存ボタンを活性にする
+- 見積書0件時に保存された明細は、保存データ上では `quotation: { id: "manual-entry", name: "見積書なし" }` のグループとして扱う
 - `selectQuotation(id)` 呼び出し時は、先にダミー（`quotationId === ""`）を除去してから、選択された見積書のエントリを append する
   - 最初の選択: ダミー除去 → 新規エントリ append（エントリ数は1件のまま）
   - 以降の選択: ダミーは既に存在しないので単に append

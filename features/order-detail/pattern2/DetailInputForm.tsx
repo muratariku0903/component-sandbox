@@ -6,14 +6,17 @@ interface DetailInputFormProps {
   quotationId: string;
   form: UseFormReturn<OrderDetailModalFormData>;
   quotationIndex: number;
+  canEditWithoutQuotation?: boolean;
 }
 
 export function DetailInputForm({
   quotationId,
   form,
   quotationIndex,
+  canEditWithoutQuotation = false,
 }: DetailInputFormProps) {
-  const disabled = !quotationId || quotationIndex === -1;
+  const disabled =
+    quotationIndex === -1 || (!quotationId && !canEditWithoutQuotation);
 
   return (
     <QuotationDetailForm
