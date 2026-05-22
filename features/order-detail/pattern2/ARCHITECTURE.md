@@ -1,19 +1,7 @@
-# パターン2: ネスト useFieldArray（RHF 内データ管理）
+# 発注明細: ネスト useFieldArray（RHF 内データ管理）
 
 ## 概要
-全見積書のデータを React Hook Form の `quotationEntries` 配列で一括管理し、`useRef` を不要にする方式。見積書ごとに `useFieldArray` をネストして明細行を管理する。
-
----
-
-## パターン1 との比較
-
-| | パターン1 | パターン2 |
-|---|----------|----------|
-| データ保持 | RHF（現在の見積書）+ useRef（他の見積書） | RHF のみ（全見積書） |
-| 見積書切替 | ref に退避 → ref から復元 → replace | selectedId を変更するだけ |
-| useFieldArray | 固定名 `"currentDetails"` 1つ | 見積書ごとに `quotationEntries.${idx}.details` |
-| バリデーション | リアルタイム活性制御（isAllFilled） | Zodクリック時検証（validateCurrentQuotation） |
-| コンポーネント | DetailInputForm が直接明細行を描画 | QuotationDetailForm に委譲 |
+全見積書のデータを React Hook Form の `quotationEntries` 配列で一括管理する方式。見積書ごとに `useFieldArray` をネストして明細行を管理する。
 
 ---
 
@@ -37,14 +25,14 @@ API送信 (将来実装)
 
 ### 1. ページレベル RHF (`OrderDetailPage.tsx`)
 
-パターン1と同一。`useForm<PageFormData>` で `orderName` と `savedDetails` を管理。
+`useForm<PageFormData>` で `orderName` と `savedDetails` を管理する。
 
 ---
 
 ### 2. モーダルレベル RHF (`AddOrderDetailModal.tsx` 内に直接実装)
 
 ```typescript
-useForm<Pattern2ModalFormData>({
+useForm<OrderDetailModalFormData>({
   defaultValues: {
     taxType: "tax_exclusive",
     quotationEntries: [],
@@ -66,7 +54,7 @@ useForm<Pattern2ModalFormData>({
 }
 ```
 
-#### Pattern2 固有の型 (`types.ts`)
+#### モーダル固有の型 (`types.ts`)
 
 ```typescript
 interface QuotationFormEntry {
@@ -74,7 +62,7 @@ interface QuotationFormEntry {
   details: DetailItem[];
 }
 
-interface Pattern2ModalFormData {
+interface OrderDetailModalFormData {
   taxType: TaxType;
   quotationEntries: QuotationFormEntry[];
 }
@@ -126,7 +114,7 @@ register(`quotationEntries.${quotationIndex}.details.${detailIndex}.unitPrice`, 
    → RHF 内のデータをそのまま読み込む（退避/復元なし）
 ```
 
-**パターン1 との決定的な違い**: データの退避/復元が一切不要。RHF 内に全見積書のデータが常駐しているため、選択 ID の変更だけで切り替えが完了する。
+RHF 内に全見積書のデータが常駐しているため、選択 ID の変更だけで切り替えが完了する。
 
 ---
 
@@ -188,13 +176,6 @@ register(`quotationEntries.${quotationIndex}.details.${detailIndex}.unitPrice`, 
 
 唯一の利用箇所が `AddOrderDetailModal` だけだったため、フックには切り出さず同コンポーネント内にロジックを直接記述する。
 
-#### パターン1 から不要になったもの
-
-- `useRef` → 不要（全データが RHF 内）
-- `fieldArray` / `replace()` → 不要（各 QuotationDetailForm が自身の useFieldArray を持つ）
-- `saveCurrentToRef()` → 不要
-- `isAllFilled()` → Zod検証に置換
-
 #### モーダル内に保持する状態・関数
 
 | 名前 | 型 | 説明 |
@@ -206,7 +187,7 @@ register(`quotationEntries.${quotationIndex}.details.${detailIndex}.unitPrice`, 
 | `initializeFromSaved` | `(details) => void` | モーダル再オープン時に savedDetails から復元 |
 | `resetForm` | `() => void` | ダミーエントリ1件だけの初期状態に戻す |
 
-> 明細行の追加/削除はパターン2 では `QuotationDetailForm` 内の `useFieldArray.append` / `remove` で完結するため、モーダルからは公開していない。
+> 明細行の追加/削除は `QuotationDetailForm` 内の `useFieldArray.append` / `remove` で完結するため、モーダルからは公開していない。
 
 ---
 
@@ -214,15 +195,13 @@ register(`quotationEntries.${quotationIndex}.details.${detailIndex}.unitPrice`, 
 
 ```
 AddOrderDetailModal
-  ├── QuotationSelector（pattern1 から再利用）
-  └── DetailInputForm（pattern2 版）
+  ├── QuotationSelector
+  └── DetailInputForm
         └── QuotationDetailForm（新規: 見積書ごとに useFieldArray を持つ）
               └── 明細行（register パスがネスト + エラー表示）
 ```
 
 ### QuotationDetailForm（新コンポーネント）
-
-パターン1 の `DetailInputForm` が担っていた明細行の描画を分離。
 
 - `useFieldArray` を内部で生成（`fields`, `append`, `remove`）
 - 明細の追加/削除ボタンもこのコンポーネント内に配置
@@ -230,7 +209,7 @@ AddOrderDetailModal
 - `form.formState.errors` からフィールド単位のエラーを取得し、`<Field invalid errorText>` で表示
 - `disabled` prop で全入力・追加/削除ボタンを非活性化可能（見積書未選択時の表示に使用）
 
-### DetailInputForm（pattern2 版）
+### DetailInputForm
 
 - 薄いラッパー
 - 見積書未選択時: `QuotationDetailForm` に `disabled` を渡して非活性の1行を表示
@@ -249,7 +228,7 @@ AddOrderDetailModal
 
 ## 認可依頼時のバリデーション（OrderDetailPage）
 
-パターン1と同一。認可依頼ボタン押下時に価格交渉金額と発注金額の一致を検証する。
+認可依頼ボタン押下時に価格交渉金額と発注金額の一致を検証する。
 
 ```
 認可依頼ボタン押下
@@ -281,7 +260,7 @@ AddOrderDetailModal
 - `selectedQuotationId` が変わるたびに再計算される
 
 ### register と valueAsNumber
-- パターン1と同様、`valueAsNumber: true` による空入力 → `NaN` の挙動に注意
+- `valueAsNumber: true` による空入力 → `NaN` の挙動に注意
 - `detailItemSchema` 側で空文字・NaN を必須エラーとして扱う
 
 ### Zodバリデーションの手動実行

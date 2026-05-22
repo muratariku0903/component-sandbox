@@ -1,10 +1,10 @@
 import type { UseFormReturn } from "react-hook-form";
-import type { Pattern2ModalFormData } from "./types";
+import type { OrderDetailModalFormData } from "./types";
 import { QuotationDetailForm } from "./QuotationDetailForm";
 
 interface DetailInputFormProps {
   quotationId: string;
-  form: UseFormReturn<Pattern2ModalFormData>;
+  form: UseFormReturn<OrderDetailModalFormData>;
   quotationIndex: number;
 }
 

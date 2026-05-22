@@ -19,7 +19,7 @@ import type {
   TaxType,
 } from "../shared/types";
 import { detailItemSchema, quotationDetailsSchema } from "../shared/types";
-import type { Pattern2ModalFormData, QuotationFormEntry } from "./types";
+import type { OrderDetailModalFormData, QuotationFormEntry } from "./types";
 
 type DetailFieldName = keyof DetailItem;
 
@@ -57,7 +57,7 @@ export function AddOrderDetailModal({
 }: AddOrderDetailModalProps) {
   const [selectedQuotationId, setSelectedQuotationId] = useState<string>("");
 
-  const form = useForm<Pattern2ModalFormData>({
+  const form = useForm<OrderDetailModalFormData>({
     defaultValues: {
       taxType: "tax_exclusive",
       quotationEntries: createInitialEntries(),

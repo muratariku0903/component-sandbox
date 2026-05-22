@@ -5,11 +5,11 @@ import {
   NativeSelectField,
 } from "@/components/ui/native-select";
 import { useFieldArray, type UseFormReturn } from "react-hook-form";
-import type { Pattern2ModalFormData } from "./types";
+import type { OrderDetailModalFormData } from "./types";
 import { LuPlus, LuTrash2 } from "react-icons/lu";
 
 interface QuotationDetailFormProps {
-  form: UseFormReturn<Pattern2ModalFormData>;
+  form: UseFormReturn<OrderDetailModalFormData>;
   quotationIndex: number;
   disabled?: boolean;
 }

@@ -62,7 +62,7 @@ function getProductNameInputAt(row: number): HTMLInputElement {
   return getProductNameInputs()[row];
 }
 
-describe("AddOrderDetailModal (pattern2)", () => {
+describe("AddOrderDetailModal", () => {
   // --- 初期表示 ---
   describe("初期表示", () => {
     it("モーダルが表示される", () => {

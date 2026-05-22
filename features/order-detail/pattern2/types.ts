@@ -6,8 +6,8 @@ export interface QuotationFormEntry {
   details: DetailItem[];
 }
 
-/** パターン2: モーダルフォームデータ（全見積書を一括管理） */
-export interface Pattern2ModalFormData {
+/** モーダルフォームデータ（全見積書を一括管理） */
+export interface OrderDetailModalFormData {
   taxType: TaxType;
   quotationEntries: QuotationFormEntry[];
 }

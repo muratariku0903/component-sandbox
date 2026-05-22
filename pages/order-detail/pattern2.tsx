@@ -35,13 +35,13 @@ const mockSavedData: PageFormData = {
   ],
 };
 
-export default function OrderDetailPattern2Route() {
+export default function OrderDetailRoute() {
   const [mode, setMode] = useState<"new" | "saved">("new");
 
   return (
     <>
       <Head>
-        <title>発注明細（パターン2）</title>
+        <title>発注明細</title>
       </Head>
 
       <Box bg="gray.100" p={3} mb={4}>
