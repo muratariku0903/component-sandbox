@@ -33,6 +33,7 @@ API送信 (将来実装)
 
 ```typescript
 useForm<OrderDetailModalFormData>({
+  resolver: zodResolver(orderDetailModalFormSchema),
   defaultValues: {
     taxType: "tax_exclusive",
     quotationEntries: [],
@@ -120,29 +121,27 @@ RHF 内に全見積書のデータが常駐しているため、選択 ID の変
 
 ### 5. Zodバリデーションフロー
 
-**検証ルールは `shared/types.ts` の Zod スキーマに集約する。**
-モーダル内のバリデーション処理は検証ロジックを持たず、Zod の結果を RHF の `setError` に流し込むだけ。
+**検証ルールは Zod スキーマに集約する。**
+モーダル内のバリデーション処理は検証ロジックを持たず、RHF の `trigger()` を呼ぶだけにする。
 
 #### スキーマ階層
 
 | スキーマ | 内容 |
 |---------|------|
 | `detailItemSchema` | 明細1行。`productName.min(1)` と `amount.refine(positive)` で必須チェック |
-| `quotationDetailsSchema` | `z.array(detailItemSchema)`。Zod が配列 iterate を担い、issue.path = `[detailIndex, fieldName]` で返す |
+| `quotationFormEntrySchema` | 見積書1件分。`details` に `z.array(detailItemSchema)` を持つ |
+| `orderDetailModalFormSchema` | モーダル全体。`taxType` と全見積書の `quotationEntries` を検証する |
 
-クロス行/クロスフィールドの検証（合計金額チェックなど）が将来必要になれば `quotationDetailsSchema` に `.superRefine()` を追加する。
+クロス行/クロスフィールドの検証（合計金額チェックなど）が将来必要になれば `orderDetailModalFormSchema` に `.superRefine()` を追加する。
 
 #### 明細追加/更新ボタン押下時・見積書切替時（共通：validateCurrentQuotation）
 
 ```
 呼び出し
-  ↓ form.clearErrors でこの見積書のエラーをクリア
-  ↓ quotationDetailsSchema.safeParse(currentEntry.details)
-  │   Zod が全行を iterate し、各 issue.path = [detailIndex, fieldName] を生成
-  ├── success: true
-  └── !success: 各 issue を RHF の setError に流し込む
-        → path: quotationEntries.${currentIdx}.details.${detailIdx}.${fieldName}
-        → message: issue.message（スキーマ側で定義）
+  ↓ form.trigger(`quotationEntries.${currentIdx}.details`)
+  ↓ zodResolver(orderDetailModalFormSchema) が Zod schema を実行
+  ├── true: 検証成功
+  └── false: RHF が該当フィールドの errors にメッセージを反映
 ```
 
 保存時: 失敗→保存中断、成功→保存処理へ
@@ -165,7 +164,7 @@ RHF 内に全見積書のデータが常駐しているため、選択 ID の変
 
 #### エラー表示の仕組み
 
-- `form.setError()` で設定されたエラーは `form.formState.errors` に反映
+- `zodResolver` 経由で設定されたエラーは `form.formState.errors` に反映
 - `QuotationDetailForm` が `errors?.quotationEntries?.[quotationIndex]?.details?.[index]` でアクセス
 - `<Field invalid={!!fieldErrors?.fieldName} errorText={fieldErrors?.fieldName?.message}>` で表示
 - `AddOrderDetailModal` で `form.formState.errors` を購読し、エラー変更時に再レンダリング（見積書切替ブロック時にセレクトを元の値に戻すため）
@@ -263,7 +262,7 @@ AddOrderDetailModal
 - `valueAsNumber: true` による空入力 → `NaN` の挙動に注意
 - `detailItemSchema` 側で空文字・NaN を必須エラーとして扱う
 
-### Zodバリデーションの手動実行
-- `zodResolver` は使用せず、`detailItemSchema.safeParse()` を手動で呼び出す
-- `form.setError()` / `form.clearErrors()` でエラーを制御
+### Zodバリデーションの実行
+- `zodResolver(orderDetailModalFormSchema)` を `useForm` に設定する
+- 保存時・見積書切替時は共通の `validateCurrentQuotation()` から `form.trigger()` を呼ぶ
 - 空行も含め全行を検証する（空行スキップは行わない）。不要な行はゴミ箱アイコンで削除

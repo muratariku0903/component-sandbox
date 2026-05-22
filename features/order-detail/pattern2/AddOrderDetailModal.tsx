@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Button, Grid, GridItem } from "@chakra-ui/react";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import {
   DialogRoot,
@@ -18,13 +19,8 @@ import type {
   SavedQuotationDetail,
   TaxType,
 } from "../shared/types";
-import { detailItemSchema, quotationDetailsSchema } from "../shared/types";
 import type { OrderDetailModalFormData, QuotationFormEntry } from "./types";
-
-type DetailFieldName = keyof DetailItem;
-
-const isDetailFieldName = (name: unknown): name is DetailFieldName =>
-  typeof name === "string" && name in detailItemSchema.shape;
+import { orderDetailModalFormSchema } from "./types";
 
 const createEmptyDetail = (): DetailItem => ({
   productName: "",
@@ -58,6 +54,7 @@ export function AddOrderDetailModal({
   const [selectedQuotationId, setSelectedQuotationId] = useState<string>("");
 
   const form = useForm<OrderDetailModalFormData>({
+    resolver: zodResolver(orderDetailModalFormSchema),
     defaultValues: {
       taxType: "tax_exclusive",
       quotationEntries: createInitialEntries(),
@@ -76,94 +73,70 @@ export function AddOrderDetailModal({
     return entries.findIndex((e) => e.quotationId === selectedQuotationId);
   }, [selectedQuotationId, getValues]);
 
-  // 現在の見積書をバリデーション（全行を検証、空行も含む）。
-  // 検証ロジックは quotationDetailsSchema（shared/types.ts）に集約されており、
-  // ここでは Zod の結果を RHF の setError に流し込むだけ。
-  const validateCurrentQuotation = useCallback((): boolean => {
+  async function validateCurrentQuotation(): Promise<boolean> {
     const entries = getValues("quotationEntries");
     const currentIdx = entries.findIndex(
       (e) => e.quotationId === selectedQuotationId
     );
     if (currentIdx === -1) return true;
 
-    form.clearErrors(`quotationEntries.${currentIdx}.details`);
+    return form.trigger(`quotationEntries.${currentIdx}.details`, {
+      shouldFocus: true,
+    });
+  }
 
-    const result = quotationDetailsSchema.safeParse(entries[currentIdx].details);
-    if (result.success) return true;
-
-    for (const issue of result.error.issues) {
-      // issue.path = [detailIndex, fieldName]
-      const detailIdx = issue.path[0];
-      const fieldName = issue.path[1];
-      if (typeof detailIdx !== "number" || !isDetailFieldName(fieldName)) continue;
-
-      form.setError(
-        `quotationEntries.${currentIdx}.details.${detailIdx}.${fieldName}`,
-        { message: issue.message }
+  async function selectQuotation(quotationId: string) {
+    if (selectedQuotationId && selectedQuotationId !== quotationId) {
+      if (!(await validateCurrentQuotation())) {
+        return; // バリデーション失敗: 切替を阻止
+      }
+      const entries = getValues("quotationEntries");
+      const currentIdx = entries.findIndex(
+        (e) => e.quotationId === selectedQuotationId
       );
+      if (currentIdx !== -1) {
+        form.clearErrors(`quotationEntries.${currentIdx}.details`);
+      }
     }
 
-    return false;
-  }, [form, getValues, selectedQuotationId]);
+    const entries = getValues("quotationEntries");
+    const entriesWithoutDummy = entries.filter((e) => e.quotationId !== "");
+    const exists = entriesWithoutDummy.some(
+      (e) => e.quotationId === quotationId
+    );
 
-  const selectQuotation = useCallback(
-    (quotationId: string) => {
-      if (selectedQuotationId && selectedQuotationId !== quotationId) {
-        if (!validateCurrentQuotation()) {
-          return; // バリデーション失敗: 切替を阻止
-        }
-        const entries = getValues("quotationEntries");
-        const currentIdx = entries.findIndex(
-          (e) => e.quotationId === selectedQuotationId
-        );
-        if (currentIdx !== -1) {
-          form.clearErrors(`quotationEntries.${currentIdx}.details`);
-        }
-      }
+    if (!exists) {
+      form.setValue("quotationEntries", [
+        ...entriesWithoutDummy,
+        { quotationId, details: [createEmptyDetail()] },
+      ]);
+    } else if (entriesWithoutDummy.length !== entries.length) {
+      form.setValue("quotationEntries", entriesWithoutDummy);
+    }
 
-      const entries = getValues("quotationEntries");
-      const entriesWithoutDummy = entries.filter((e) => e.quotationId !== "");
-      const exists = entriesWithoutDummy.some(
-        (e) => e.quotationId === quotationId
-      );
+    setSelectedQuotationId(quotationId);
+  }
 
-      if (!exists) {
-        form.setValue("quotationEntries", [
-          ...entriesWithoutDummy,
-          { quotationId, details: [createEmptyDetail()] },
-        ]);
-      } else if (entriesWithoutDummy.length !== entries.length) {
-        form.setValue("quotationEntries", entriesWithoutDummy);
-      }
+  function initializeFromSaved(details: SavedQuotationDetail[]) {
+    if (details.length === 0) return;
 
-      setSelectedQuotationId(quotationId);
-    },
-    [form, getValues, selectedQuotationId, validateCurrentQuotation]
-  );
+    const entries: QuotationFormEntry[] = details.map((saved) => ({
+      quotationId: saved.quotation.id,
+      details: structuredClone(saved.details),
+    }));
 
-  const initializeFromSaved = useCallback(
-    (details: SavedQuotationDetail[]) => {
-      if (details.length === 0) return;
+    form.setValue("taxType", details[0].taxType);
+    form.setValue("quotationEntries", entries);
+    setSelectedQuotationId(details[0].quotation.id);
+  }
 
-      const entries: QuotationFormEntry[] = details.map((saved) => ({
-        quotationId: saved.quotation.id,
-        details: structuredClone(saved.details),
-      }));
-
-      form.setValue("taxType", details[0].taxType);
-      form.setValue("quotationEntries", entries);
-      setSelectedQuotationId(details[0].quotation.id);
-    },
-    [form]
-  );
-
-  const resetForm = useCallback(() => {
+  function resetForm() {
     form.reset({
       taxType: "tax_exclusive",
       quotationEntries: createInitialEntries(),
     });
     setSelectedQuotationId("");
-  }, [form]);
+  }
 
   // モーダルオープン時に保存済みデータがあれば初期化
   const prevOpenRef = useRef(false);
@@ -174,7 +147,7 @@ export function AddOrderDetailModal({
       }
     }
     prevOpenRef.current = open;
-  }, [open, savedDetails, initializeFromSaved]);
+  }, [open, savedDetails]);
 
   const isEditing = savedDetails.length > 0;
 
@@ -183,9 +156,9 @@ export function AddOrderDetailModal({
     onClose();
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     // 現在の見積書のみ検証。他の見積書は「切替成功時に検証済み」の不変条件により既に valid
-    if (!validateCurrentQuotation()) return;
+    if (!(await validateCurrentQuotation())) return;
 
     const entries = getValues("quotationEntries");
     const currentTaxType = form.getValues("taxType");

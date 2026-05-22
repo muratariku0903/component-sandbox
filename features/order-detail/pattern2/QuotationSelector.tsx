@@ -10,7 +10,7 @@ import type { Quotation, TaxType } from "../shared/types";
 interface QuotationSelectorProps {
   quotations: Quotation[];
   selectedQuotationId: string;
-  onSelectQuotation: (id: string) => void;
+  onSelectQuotation: (id: string) => void | Promise<void>;
   taxType: TaxType;
   onTaxTypeChange: (value: TaxType) => void;
 }
@@ -29,7 +29,7 @@ export function QuotationSelector({
           <NativeSelectField
             placeholder="選択してください"
             value={selectedQuotationId}
-            onChange={(e) => onSelectQuotation(e.target.value)}
+            onChange={(e) => void onSelectQuotation(e.target.value)}
             items={quotations.map((q) => ({
               value: q.id,
               label: q.name,
