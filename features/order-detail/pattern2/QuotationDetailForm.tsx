@@ -1,4 +1,9 @@
 import { Box, Button, HStack, Input, Text, IconButton } from "@chakra-ui/react";
+import type {
+  ChangeEvent,
+  ClipboardEvent,
+  KeyboardEvent,
+} from "react";
 import { Field } from "@/components/ui/field";
 import {
   NativeSelectRoot,
@@ -12,6 +17,35 @@ interface QuotationDetailFormProps {
   form: UseFormReturn<OrderDetailModalFormData>;
   quotationIndex: number;
   disabled?: boolean;
+}
+
+const integerControlKeys = new Set([
+  "Backspace",
+  "Delete",
+  "Tab",
+  "Enter",
+  "Escape",
+  "ArrowLeft",
+  "ArrowRight",
+  "ArrowUp",
+  "ArrowDown",
+  "Home",
+  "End",
+]);
+
+function normalizeIntegerInput(value: string): string {
+  if (value === "") return "";
+
+  const sign = value.startsWith("-") ? "-" : "";
+  const integerPart = (sign ? value.slice(1) : value)
+    .split(/[.,]/)[0]
+    .replace(/\D/g, "");
+
+  return `${sign}${integerPart}`;
+}
+
+function isIntegerText(value: string): boolean {
+  return /^-?\d*$/.test(value);
 }
 
 export function QuotationDetailForm({
@@ -50,6 +84,46 @@ export function QuotationDetailForm({
       {fields.map((field, index) => {
         const fieldErrors =
           errors?.quotationEntries?.[quotationIndex]?.details?.[index];
+        const amountRegistration = register(`${basePath}.${index}.amount`, {
+          setValueAs: (value) =>
+            value === "" || value === "-" ? "" : Number(value),
+        });
+
+        const handleAmountKeyDown = (
+          event: KeyboardEvent<HTMLInputElement>
+        ) => {
+          if (event.metaKey || event.ctrlKey || event.altKey) return;
+          if (integerControlKeys.has(event.key)) return;
+
+          if (event.key === "-") {
+            const input = event.currentTarget;
+            const canInsertMinus =
+              input.selectionStart === 0 && !input.value.includes("-");
+            if (!canInsertMinus) event.preventDefault();
+            return;
+          }
+
+          if (!/^\d$/.test(event.key)) {
+            event.preventDefault();
+          }
+        };
+
+        const handleAmountPaste = (
+          event: ClipboardEvent<HTMLInputElement>
+        ) => {
+          if (!isIntegerText(event.clipboardData.getData("text"))) {
+            event.preventDefault();
+          }
+        };
+
+        const handleAmountChange = (
+          event: ChangeEvent<HTMLInputElement>
+        ) => {
+          event.currentTarget.value = normalizeIntegerInput(
+            event.currentTarget.value
+          );
+          amountRegistration.onChange(event);
+        };
 
         return (
           <Box
@@ -97,7 +171,13 @@ export function QuotationDetailForm({
                 />
               </Field>
 
-              <Field label="商品型番号" flex="1" minW="120px">
+              <Field
+                label="商品型番号"
+                flex="1"
+                minW="120px"
+                invalid={!!fieldErrors?.modelNumber}
+                errorText={fieldErrors?.modelNumber?.message}
+              >
                 <Input
                   {...register(`${basePath}.${index}.modelNumber`)}
                   placeholder="型番号"
@@ -107,7 +187,13 @@ export function QuotationDetailForm({
             </HStack>
 
             <HStack gap={3} mt={3} flexWrap="wrap">
-              <Field label="単価" flex="1" minW="100px">
+              <Field
+                label="単価"
+                flex="1"
+                minW="100px"
+                invalid={!!fieldErrors?.unitPrice}
+                errorText={fieldErrors?.unitPrice?.message}
+              >
                 <Input
                   type="number"
                   {...register(`${basePath}.${index}.unitPrice`, {
@@ -118,7 +204,13 @@ export function QuotationDetailForm({
                 />
               </Field>
 
-              <Field label="数量" flex="1" minW="80px">
+              <Field
+                label="数量"
+                flex="1"
+                minW="80px"
+                invalid={!!fieldErrors?.quantity}
+                errorText={fieldErrors?.quantity?.message}
+              >
                 <Input
                   type="number"
                   {...register(`${basePath}.${index}.quantity`, {
@@ -158,10 +250,13 @@ export function QuotationDetailForm({
                 errorText={fieldErrors?.amount?.message}
               >
                 <Input
-                  type="number"
-                  {...register(`${basePath}.${index}.amount`, {
-                    valueAsNumber: true,
-                  })}
+                  type="text"
+                  inputMode="numeric"
+                  pattern="-?[0-9]*"
+                  {...amountRegistration}
+                  onKeyDown={handleAmountKeyDown}
+                  onPaste={handleAmountPaste}
+                  onChange={handleAmountChange}
                   placeholder="0"
                   disabled={disabled}
                 />

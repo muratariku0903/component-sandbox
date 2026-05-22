@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Provider } from "@/components/ui/provider";
 import { AddOrderDetailModal } from "../AddOrderDetailModal";
@@ -60,6 +60,10 @@ function getAmountInputAt(row: number): HTMLInputElement {
 /** N 行目 (0-origin) の商品名フィールドを取得 */
 function getProductNameInputAt(row: number): HTMLInputElement {
   return getProductNameInputs()[row];
+}
+
+function getModelNumberInputAt(row: number): HTMLInputElement {
+  return screen.getAllByPlaceholderText("型番号")[row] as HTMLInputElement;
 }
 
 describe("AddOrderDetailModal", () => {
@@ -262,6 +266,140 @@ describe("AddOrderDetailModal", () => {
       expect(onSave).not.toHaveBeenCalled();
     });
 
+    it("商品名が101文字以上の場合はバリデーションエラーが表示される", async () => {
+      const user = userEvent.setup();
+      const { onSave } = renderModal();
+
+      await user.selectOptions(getQuotationSelect(), "quote-1");
+      await user.type(getProductNameInputAt(0), "あ".repeat(101));
+      await user.type(getAmountInputAt(0), "1000");
+
+      await user.click(screen.getByRole("button", { name: "明細追加" }));
+
+      expect(
+        screen.getByText("商品名は100文字以内で入力してください")
+      ).toBeInTheDocument();
+      expect(onSave).not.toHaveBeenCalled();
+    });
+
+    it("商品型番号が76文字以上の場合はバリデーションエラーが表示される", async () => {
+      const user = userEvent.setup();
+      const { onSave } = renderModal();
+
+      await user.selectOptions(getQuotationSelect(), "quote-1");
+      await user.type(getProductNameInputAt(0), "商品A");
+      await user.type(getModelNumberInputAt(0), "A".repeat(76));
+      await user.type(getAmountInputAt(0), "1000");
+
+      await user.click(screen.getByRole("button", { name: "明細追加" }));
+
+      expect(
+        screen.getByText("商品型番号は75文字以内で入力してください")
+      ).toBeInTheDocument();
+      expect(onSave).not.toHaveBeenCalled();
+    });
+
+    it("単価が0の場合はバリデーションエラーが表示される", async () => {
+      const user = userEvent.setup();
+      const { onSave } = renderModal();
+
+      await user.selectOptions(getQuotationSelect(), "quote-1");
+      await user.type(getProductNameInputAt(0), "商品A");
+      await user.type(getNumberInputs()[0], "0");
+      await user.type(getAmountInputAt(0), "1000");
+
+      await user.click(screen.getByRole("button", { name: "明細追加" }));
+
+      expect(screen.getByText("単価は0以外を入力してください")).toBeInTheDocument();
+      expect(onSave).not.toHaveBeenCalled();
+    });
+
+    it("金額が0の場合はバリデーションエラーが表示される", async () => {
+      const user = userEvent.setup();
+      const { onSave } = renderModal();
+
+      await user.selectOptions(getQuotationSelect(), "quote-1");
+      await user.type(getProductNameInputAt(0), "商品A");
+      await user.type(getAmountInputAt(0), "0");
+
+      await user.click(screen.getByRole("button", { name: "明細追加" }));
+
+      expect(screen.getByText("金額は0以外を入力してください")).toBeInTheDocument();
+      expect(onSave).not.toHaveBeenCalled();
+    });
+
+    it("数量が0の場合はバリデーションエラーが表示される", async () => {
+      const user = userEvent.setup();
+      const { onSave } = renderModal();
+
+      await user.selectOptions(getQuotationSelect(), "quote-1");
+      await user.type(getProductNameInputAt(0), "商品A");
+      fireEvent.change(getNumberInputs()[0], { target: { value: "100" } });
+      fireEvent.change(getNumberInputs()[1], { target: { value: "0" } });
+      await user.type(getAmountInputAt(0), "1000");
+
+      await user.click(screen.getByRole("button", { name: "明細追加" }));
+
+      expect(screen.getByText("数量は0以外を入力してください")).toBeInTheDocument();
+      expect(onSave).not.toHaveBeenCalled();
+    });
+
+    it("金額入力では小数を受け付けず整数に正規化される", async () => {
+      const user = userEvent.setup();
+      renderModal();
+
+      await user.selectOptions(getQuotationSelect(), "quote-1");
+      fireEvent.change(getAmountInputAt(0), { target: { value: "100.5" } });
+
+      expect(getAmountInputAt(0)).toHaveValue("100");
+    });
+
+    it("単価と数量が入力されている場合、金額が単価×数量と一致しないと保存できない", async () => {
+      const user = userEvent.setup();
+      const { onSave } = renderModal();
+
+      await user.selectOptions(getQuotationSelect(), "quote-1");
+      await user.type(getProductNameInputAt(0), "商品A");
+      fireEvent.change(getNumberInputs()[0], { target: { value: "100" } });
+      fireEvent.change(getNumberInputs()[1], { target: { value: "3" } });
+      fireEvent.change(getAmountInputAt(0), { target: { value: "299" } });
+
+      await user.click(screen.getByRole("button", { name: "明細追加" }));
+
+      expect(
+        screen.getByText("金額が単価×数量と一致しません")
+      ).toBeInTheDocument();
+      expect(onSave).not.toHaveBeenCalled();
+    });
+
+    it("単価または数量が空の場合は単価×数量の一致チェックを行わない", async () => {
+      const user = userEvent.setup();
+      const { onSave } = renderModal();
+
+      await user.selectOptions(getQuotationSelect(), "quote-1");
+      await user.type(getProductNameInputAt(0), "商品A");
+      await user.type(getAmountInputAt(0), "299");
+
+      await user.click(screen.getByRole("button", { name: "明細追加" }));
+
+      expect(onSave).toHaveBeenCalledTimes(1);
+    });
+
+    it("単価に小数が含まれる場合、金額との差分が1以内なら保存できる", async () => {
+      const user = userEvent.setup();
+      const { onSave } = renderModal();
+
+      await user.selectOptions(getQuotationSelect(), "quote-1");
+      await user.type(getProductNameInputAt(0), "商品A");
+      fireEvent.change(getNumberInputs()[0], { target: { value: "33.3" } });
+      fireEvent.change(getNumberInputs()[1], { target: { value: "3" } });
+      fireEvent.change(getAmountInputAt(0), { target: { value: "100" } });
+
+      await user.click(screen.getByRole("button", { name: "明細追加" }));
+
+      expect(onSave).toHaveBeenCalledTimes(1);
+    });
+
     it("全フィールド正しく入力するとバリデーション通過して保存される", async () => {
       const user = userEvent.setup();
       const { onSave, onClose } = renderModal();
@@ -281,6 +419,24 @@ describe("AddOrderDetailModal", () => {
 
       expect(onSave).toHaveBeenCalledTimes(1);
       expect(onClose).toHaveBeenCalledTimes(1);
+    });
+
+    it("単価と金額は負の値でも保存できる", async () => {
+      const user = userEvent.setup();
+      const { onSave } = renderModal();
+
+      await user.selectOptions(getQuotationSelect(), "quote-1");
+      await user.type(getProductNameInputAt(0), "割引");
+      await user.type(getNumberInputs()[0], "-100");
+      await user.type(getAmountInputAt(0), "-1000");
+
+      await user.click(screen.getByRole("button", { name: "明細追加" }));
+
+      expect(onSave).toHaveBeenCalledTimes(1);
+      const savedData = onSave.mock.calls[0][0] as SavedQuotationDetail[];
+      expect(savedData[0].details[0].unitPrice).toBe(-100);
+      expect(savedData[0].details[0].amount).toBe(-1000);
+      expect(savedData[0].subtotal).toBe(-1000);
     });
 
     it("税込で必須フィールドが入力済みなら保存できる（税率はデフォルト10%で常に有効）", async () => {
@@ -449,7 +605,7 @@ describe("AddOrderDetailModal", () => {
 
       expect(getProductNameInputAt(0)).toHaveValue("商品A");
       expect(screen.getByPlaceholderText("型番号")).toHaveValue("ABC-123");
-      expect(getAmountInputAt(0)).toHaveValue(1000);
+      expect(getAmountInputAt(0)).toHaveValue("1000");
     });
   });
 

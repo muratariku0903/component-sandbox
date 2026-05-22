@@ -30,19 +30,70 @@ export interface SavedQuotationDetail {
   subtotal: number;
 }
 
+const optionalNumberSchema = z.union([z.number(), z.literal(""), z.nan()]);
+
+const isEnteredNumber = (val: number | ""): val is number =>
+  val !== "" && !Number.isNaN(val);
+
 /** 明細行の Zod スキーマ */
-export const detailItemSchema = z.object({
-  productName: z.string().min(1, "商品名は必須です"),
-  modelNumber: z.string(),
-  unitPrice: z.union([z.number(), z.literal(""), z.nan()]),
-  quantity: z.union([z.number(), z.literal(""), z.nan()]),
-  taxRate: z.union([z.literal(0), z.literal(8), z.literal(10), z.literal("")]),
-  amount: z
-    .union([z.number(), z.literal(""), z.nan()])
-    .refine((val) => val !== "" && !Number.isNaN(val) && Number(val) > 0, {
-      message: "金額は必須です",
-    }),
-});
+export const detailItemSchema = z
+  .object({
+    productName: z
+      .string()
+      .min(1, "商品名は必須です")
+      .max(100, "商品名は100文字以内で入力してください"),
+    modelNumber: z
+      .string()
+      .max(75, "商品型番号は75文字以内で入力してください"),
+    unitPrice: optionalNumberSchema.refine(
+      (val) => !isEnteredNumber(val) || val !== 0,
+      {
+        message: "単価は0以外を入力してください",
+      }
+    ),
+    quantity: optionalNumberSchema.refine(
+      (val) => !isEnteredNumber(val) || val !== 0,
+      {
+        message: "数量は0以外を入力してください",
+      }
+    ),
+    taxRate: z.union([z.literal(0), z.literal(8), z.literal(10), z.literal("")]),
+    amount: optionalNumberSchema
+      .refine((val) => isEnteredNumber(val), {
+        message: "金額は必須です",
+      })
+      .refine((val) => !isEnteredNumber(val) || val !== 0, {
+        message: "金額は0以外を入力してください",
+      })
+      .refine((val) => !isEnteredNumber(val) || Number.isInteger(val), {
+        message: "金額は整数で入力してください",
+      }),
+  })
+  .superRefine((detail, ctx) => {
+    if (
+      !isEnteredNumber(detail.unitPrice) ||
+      !isEnteredNumber(detail.quantity) ||
+      !isEnteredNumber(detail.amount) ||
+      detail.unitPrice === 0 ||
+      detail.quantity === 0 ||
+      detail.amount === 0 ||
+      !Number.isInteger(detail.amount)
+    ) {
+      return;
+    }
+
+    const expectedAmount = detail.unitPrice * detail.quantity;
+    const diff = Math.abs(detail.amount - expectedAmount);
+    const tolerance = Number.isInteger(detail.unitPrice) ? 0 : 1;
+
+    if (diff > tolerance) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "金額が単価×数量と一致しません",
+        path: ["amount"],
+      });
+    }
+  });
 
 /** ページレベルのフォームデータ（認可依頼ペイロード） */
 export interface PageFormData {

@@ -128,11 +128,11 @@ RHF 内に全見積書のデータが常駐しているため、選択 ID の変
 
 | スキーマ | 内容 |
 |---------|------|
-| `detailItemSchema` | 明細1行。`productName.min(1)` と `amount.refine(positive)` で必須チェック |
+| `detailItemSchema` | 明細1行。商品名必須・最大100文字、商品型番号最大75文字、単価0不可（空欄・負数可）、数量0不可（空欄可）、金額必須・整数・0不可（負数可）、単価×数量と金額の整合性を検証 |
 | `quotationFormEntrySchema` | 見積書1件分。`details` に `z.array(detailItemSchema)` を持つ |
 | `orderDetailModalFormSchema` | モーダル全体。`taxType` と全見積書の `quotationEntries` を検証する |
 
-クロス行/クロスフィールドの検証（合計金額チェックなど）が将来必要になれば `orderDetailModalFormSchema` に `.superRefine()` を追加する。
+単価・数量・金額の整合性は `detailItemSchema.superRefine()` で検証する。クロス行の検証（合計金額チェックなど）が将来必要になれば `orderDetailModalFormSchema` に `.superRefine()` を追加する。
 
 #### 明細追加/更新ボタン押下時・見積書切替時（共通：validateCurrentQuotation）
 
@@ -255,7 +255,9 @@ AddOrderDetailModal
 
 ### register と valueAsNumber
 - `valueAsNumber: true` による空入力 → `NaN` の挙動に注意
-- `detailItemSchema` 側で空文字・NaN を必須エラーとして扱う
+- `detailItemSchema` 側で空文字・NaN を必須エラーとして扱う。単価・金額は割引ケースのため負数を許容し、0 はエラーにする
+- 数量は空欄を許容するが、入力された場合は 0 をエラーにする
+- 金額 input は小数点を受け付けず、schema でも整数のみ許容する。単価と数量が両方入力されている場合は `単価 × 数量` と比較し、単価が小数なら差分 `±1` まで許容する
 
 ### Zodバリデーションの実行
 - `zodResolver(orderDetailModalFormSchema)` を `useForm` に設定する
