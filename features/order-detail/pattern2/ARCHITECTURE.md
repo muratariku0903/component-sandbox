@@ -110,7 +110,7 @@ register(`quotationEntries.${quotationIndex}.details.${detailIndex}.unitPrice`, 
 
 4. setSelectedQuotationId(id) で選択 ID を更新
 
-5. DetailInputForm が key={quotationId} で QuotationDetailForm をリマウント
+5. QuotationDetailForm が key={quotationId} でリマウント
    → 新しい quotationIndex で useFieldArray が初期化
    → RHF 内のデータをそのまま読み込む（退避/復元なし）
 ```
@@ -195,24 +195,17 @@ RHF 内に全見積書のデータが常駐しているため、選択 ID の変
 ```
 AddOrderDetailModal
   ├── QuotationSelector
-  └── DetailInputForm
-        └── QuotationDetailForm（新規: 見積書ごとに useFieldArray を持つ）
-              └── 明細行（register パスがネスト + エラー表示）
+  └── QuotationDetailForm（見積書ごとに useFieldArray を持つ）
+        └── 明細行（register パスがネスト + エラー表示）
 ```
 
-### QuotationDetailForm（新コンポーネント）
+### QuotationDetailForm
 
 - `useFieldArray` を内部で生成（`fields`, `append`, `remove`）
 - 明細の追加/削除ボタンもこのコンポーネント内に配置
 - `key={quotationId}` によるリマウントで、見積書切替時にデータが自動ロードされる
 - `form.formState.errors` からフィールド単位のエラーを取得し、`<Field invalid errorText>` で表示
 - `disabled` prop で全入力・追加/削除ボタンを非活性化可能（見積書未選択時の表示に使用）
-
-### DetailInputForm
-
-- 薄いラッパー
-- 見積書未選択時: `QuotationDetailForm` に `disabled` を渡して非活性の1行を表示
-- 選択時: 通常モードで `<QuotationDetailForm key={quotationId} />` に委譲
 
 ### ダミーエントリの仕組み（未選択時の表示）
 

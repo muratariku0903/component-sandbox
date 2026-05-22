@@ -12,7 +12,7 @@ import {
   DialogCloseTrigger,
 } from "@/components/ui/dialog";
 import { QuotationSelector } from "./QuotationSelector";
-import { DetailInputForm } from "./DetailInputForm";
+import { QuotationDetailForm } from "./QuotationDetailForm";
 import type {
   DetailItem,
   Quotation,
@@ -156,6 +156,9 @@ export function AddOrderDetailModal({
   }, [open, savedDetails]);
 
   const isEditing = savedDetails.length > 0;
+  const isDetailFormDisabled =
+    selectedQuotationIndex === -1 ||
+    (!selectedQuotationId && !canEditWithoutQuotation);
 
   const handleClose = () => {
     resetForm();
@@ -233,11 +236,11 @@ export function AddOrderDetailModal({
               />
             </GridItem>
             <GridItem>
-              <DetailInputForm
-                quotationId={selectedQuotationId}
+              <QuotationDetailForm
+                key={selectedQuotationId || "placeholder"}
                 form={form}
                 quotationIndex={selectedQuotationIndex}
-                canEditWithoutQuotation={canEditWithoutQuotation}
+                disabled={isDetailFormDisabled}
               />
             </GridItem>
           </Grid>
