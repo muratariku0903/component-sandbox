@@ -18,6 +18,11 @@ export default function Home() {
               発注明細
             </Button>
           </Link>
+          <Link href="/price-negotiation">
+            <Button variant="outline" width="100%" justifyContent="flex-start">
+              価格交渉
+            </Button>
+          </Link>
         </VStack>
       </Box>
     </>
